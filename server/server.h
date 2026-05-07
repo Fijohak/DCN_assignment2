@@ -1,0 +1,29 @@
+#ifndef SERVER_SERVER_H
+#define SERVER_SERVER_H
+
+#include "../database/course_db.h"
+#include "logger.h"
+
+#ifdef _WIN32
+#include <winsock2.h>
+#else
+#include <netinet/in.h>
+typedef int SOCKET;
+#endif
+
+class Server {
+public:
+    Server(unsigned short port, CourseDB& database, Logger& logger);
+    bool start();
+
+private:
+    unsigned short port;
+    CourseDB& database;
+    Logger& logger;
+    SOCKET listenSocket;
+
+    bool createListenSocket();
+    static std::string clientAddressToString(sockaddr_in clientAddr);
+};
+
+#endif  // SERVER_SERVER_H

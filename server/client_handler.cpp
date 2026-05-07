@@ -1,0 +1,218 @@
+#include "client_handler.h"
+
+#ifdef _WIN32
+#include <winsock2.h>
+#else
+#include <sys/socket.h>
+#include <unistd.h>
+#endif
+
+#include <sstream>
+#include <iomanip>
+
+static std::string bytesToHex(const std::string& data) {
+    std::ostringstream oss;
+    for (std::size_t i = 0; i < data.size(); ++i) {
+        oss << std::hex << std::setw(2) << std::setfill('0')
+            << static_cast<int>(static_cast<unsigned char>(data[i]));
+    }
+    return oss.str();
+}
+
+ClientHandler::ClientHandler(SOCKET clientSocket,
+                             CourseDB& database,
+                             Logger& logger,
+                             const std::string& clientAddress)
+    : clientSocket(clientSocket),
+      database(database),
+      logger(logger),
+      clientAddress(clientAddress),
+      adminLoggedIn(false),
+      encryptedMode(false) {}
+
+void ClientHandler::operator()() {
+    logger.info("Client connected: " + clientAddress);
+    sendResponse("OK Connected to Course Timetable Server. Use ENCRYPT <text>|<key> to test encryption.\r\n");
+
+    bool shouldClose = false;
+    std::string line;
+
+    while (!shouldClose && receiveLine(line)) {
+        const std::string response = handleCommand(line, shouldClose);
+        if (!response.empty() && !sendResponse(response)) {
+            break;
+        }
+    }
+
+#ifdef _WIN32
+    closesocket(clientSocket);
+#else
+    close(clientSocket);
+#endif
+
+    logger.info("Client disconnected: " + clientAddress);
+}
+
+bool ClientHandler::receiveLine(std::string& line) {
+    line.clear();
+    char ch = '\0';
+
+    while (true) {
+        const int bytesReceived = recv(clientSocket, &ch, 1, 0);
+        if (bytesReceived <= 0) {
+            return false;
+        }
+
+        if (ch == '\n') {
+            return true;
+        }
+
+        if (ch != '\r') {
+            line.push_back(ch);
+        }
+
+        if (line.size() > 4096) {
+            line.clear();
+            return true;
+        }
+    }
+}
+
+bool ClientHandler::sendResponse(const std::string& response) {
+    const char* data = response.c_str();
+    int remaining = static_cast<int>(response.size());
+
+    while (remaining > 0) {
+        const int sent = send(clientSocket, data, remaining, 0);
+        if (sent <= 0) {
+            return false;
+        }
+
+        data += sent;
+        remaining -= sent;
+    }
+
+    return true;
+}
+
+std::string ClientHandler::handleCommand(const std::string& line, bool& shouldClose) {
+    const Request request = Protocol::parseRequest(line);
+
+    switch (request.type) {
+        case CommandType::Empty:
+            return "ERROR Empty command\r\n";
+
+        case CommandType::Ping:
+            logger.info(clientAddress + " PING");
+            return "OK PONG\r\n";
+
+        case CommandType::Help:
+            return Protocol::helpText();
+
+        case CommandType::Quit:
+            shouldClose = true;
+            return "OK Goodbye\r\n";
+
+        case CommandType::ListAll:
+            logger.info(clientAddress + " LIST_ALL");
+            return Protocol::formatCourses(database.getAllCourses());
+
+        case CommandType::QueryCode:
+            logger.info(clientAddress + " QUERY_CODE " + request.argument);
+            return Protocol::formatCourses(database.queryByCourseCode(request.argument));
+
+        case CommandType::QueryInstructor:
+            logger.info(clientAddress + " QUERY_INSTRUCTOR " + request.argument);
+            return Protocol::formatCourses(database.queryByInstructor(request.argument));
+
+        case CommandType::QuerySemester:
+            logger.info(clientAddress + " QUERY_SEMESTER " + request.argument);
+            return Protocol::formatCourses(database.queryBySemester(request.argument));
+
+        case CommandType::Login:
+            if (auth.login(request.fields[0], request.fields[1])) {
+                adminLoggedIn = true;
+                logger.info(clientAddress + " admin login success");
+                return "SUCCESS Logged in\r\n";
+            }
+
+            logger.error(clientAddress + " admin login failure");
+            return "FAILURE Invalid username or password\r\n";
+
+        case CommandType::Add: {
+            if (!adminLoggedIn) {
+                return "ERROR Permission denied\r\n";
+            }
+
+            Course course;
+            course.semester = request.fields[0];
+            course.courseCode = request.fields[1];
+            course.courseTitle = request.fields[2];
+            course.section = request.fields[3];
+            course.instructor = request.fields[4];
+            course.day = request.fields[5];
+            course.startTime = request.fields[6];
+            course.endTime = request.fields[7];
+            course.classroom = request.fields[8];
+
+            if (database.addCourse(course)) {
+                logger.info(clientAddress + " ADD " + course.courseCode + " " + course.section);
+                return "OK Record added\r\n";
+            }
+
+            return "ERROR Record already exists or could not be saved\r\n";
+        }
+
+        case CommandType::Update:
+            if (!adminLoggedIn) {
+                return "ERROR Permission denied\r\n";
+            }
+
+            if (database.updateCourseField(request.fields[0],
+                                           request.fields[1],
+                                           request.fields[2],
+                                           request.fields[3])) {
+                logger.info(clientAddress + " UPDATE " + request.fields[0] + " " + request.fields[1]);
+                return "OK Record updated\r\n";
+            }
+
+            return "ERROR Record not found or invalid field\r\n";
+
+        case CommandType::DeleteCourse:
+            if (!adminLoggedIn) {
+                return "ERROR Permission denied\r\n";
+            }
+
+            if (database.deleteCourse(request.fields[0], request.fields[1])) {
+                logger.info(clientAddress + " DELETE " + request.fields[0] + " " + request.fields[1]);
+                return "OK Record deleted\r\n";
+            }
+
+            return "ERROR Record not found\r\n";
+
+        case CommandType::Encrypt: {
+            const std::string& data = request.fields[0];
+            const std::string& key = request.fields[1];
+
+            std::string encrypted = Protocol::encryptXor(data, key);
+            std::string decrypted = Protocol::decryptXor(encrypted, key);
+
+            std::ostringstream oss;
+            oss << "RESULT count=4\r\n"
+                << "Original: [" << data << "]\r\n"
+                << "Key: [" << key << "]\r\n"
+                << "Encrypted (hex): [" << bytesToHex(encrypted) << "]\r\n"
+                << "Decrypted: [" << decrypted << "]\r\n"
+                << "END\r\n";
+
+            logger.info(clientAddress + " ENCRYPT demo: [" + data + "] -> hex: " + bytesToHex(encrypted));
+
+            return oss.str();
+        }
+
+        case CommandType::Invalid:
+        default:
+            logger.error(clientAddress + " invalid command: " + line);
+            return "ERROR Invalid command\r\n";
+    }
+}
