@@ -7,8 +7,8 @@ GUI_LDFLAGS = -lws2_32 -lgdi32 -lcomctl32 -mwindows
 
 # Directories
 SERVER_SRC = server/server.cpp
-CLIENT_SRC = client/client.cpp
-GUI_CLIENT_SRC = client/gui_client.cpp
+CLIENT_SRC = client/client.cpp client/network_client.cpp
+GUI_CLIENT_SRC = client/gui_client.cpp client/network_client.cpp
 SERVER_OUT = timetable_server.exe
 CLIENT_OUT = timetable_client.exe
 GUI_CLIENT_OUT = timetable_gui.exe

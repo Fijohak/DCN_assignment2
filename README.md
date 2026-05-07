@@ -6,33 +6,6 @@
 
 ---
 
-## 项目结构
-
-```
-As_2/
-├── include/
-│   ├── common.h                  # 公共数据结构定义
-│   └── protocol.h                # 通信协议定义 + 加密模块
-├── server/
-│   └── server.cpp                 # 服务器端（单文件，约550行）
-├── client/
-│   ├── client.cpp                 # CMD 客户端（命令行界面）
-│   └── gui_client.cpp             # GUI 客户端（图形界面，Win32 API）
-├── data/
-│   ├── timetable.csv              # 课程数据文件（CSV格式）
-│   ├── users.csv                  # 用户数据文件（CSV格式）
-│   └── server.log                 # 服务器运行日志
-├── Makefile                       # 编译脚本
-├── README.md                      # 本文件
-├── start_system.bat               # 一键启动脚本
-├── test_client.bat                # 测试批处理文件
-├── timetable_server.exe           # 服务器可执行文件
-├── timetable_client.exe           # CMD 客户端可执行文件
-└── timetable_gui.exe              # GUI 客户端可执行文件
-```
-
----
-
 ## 快速开始
 
 ### 方法一：使用一键启动脚本（推荐）
@@ -56,18 +29,21 @@ Enter choice (1 or 2):
 ### 方法二：手动启动
 
 **1. 编译（如无可执行文件）：**
+
+如果没有安装make工具，可以直接使用g++命令分别编译各组件：
+
 ```bash
 # 编译服务器
 g++ -std=c++11 -Wall -Wextra server/server.cpp -o timetable_server.exe -lws2_32
 
 # 编译 CMD 客户端
-g++ -std=c++11 -Wall -Wextra client/client.cpp -o timetable_client.exe -lws2_32
+g++ -std=c++11 -Wall -Wextra client/client.cpp client/network_client.cpp -o timetable_client.exe -lws2_32
 
 # 编译 GUI 客户端
-g++ -std=c++11 -Wall client/gui_client.cpp -o timetable_gui.exe -lws2_32 -lgdi32 -lcomctl32 -mwindows
+g++ -std=c++11 -Wall client/gui_client.cpp client/network_client.cpp -o timetable_gui.exe -lws2_32 -lgdi32 -lcomctl32 -mwindows
 ```
 
-或使用 Makefile：
+如果系统已安装make工具，也可以使用 Makefile：
 ```bash
 make
 ```
@@ -81,6 +57,35 @@ timetable_server.exe
 **3. 启动客户端：**
 - **CMD 客户端**：`timetable_client.exe`（输入服务器 IP 和端口）
 - **GUI 客户端**：`timetable_gui.exe`（在界面中输入服务器地址）
+
+---
+
+## 项目结构
+
+```
+As_2/
+├── include/
+│   ├── common.h                  # 公共数据结构定义
+│   ├── protocol.h                # 通信协议定义 + 加密模块
+│   └── network_client.h          # 网络客户端类声明
+├── server/
+│   └── server.cpp                 # 服务器端（单文件，约550行）
+├── client/
+│   ├── client.cpp                 # CMD 客户端（命令行界面）
+│   ├── gui_client.cpp             # GUI 客户端（图形界面，Win32 API）
+│   └── network_client.cpp         # 网络通信层（TCP + 加密）
+├── data/
+│   ├── timetable.csv              # 课程数据文件（CSV格式）
+│   ├── users.csv                  # 用户数据文件（CSV格式）
+│   └── server.log                 # 服务器运行日志
+├── Makefile                       # 编译脚本
+├── README.md                      # 本文件
+├── start_system.bat               # 一键启动脚本
+├── test_client.bat                # 测试批处理文件
+├── timetable_server.exe           # 服务器可执行文件
+├── timetable_client.exe           # CMD 客户端可执行文件
+└── timetable_gui.exe              # GUI 客户端可执行文件
+```
 
 ---
 

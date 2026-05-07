@@ -113,16 +113,20 @@
  * ============================================================
  */
 
-// Protocol constants
-#define PROTOCOL_VERSION "1.0"
-#define MSG_TERMINATOR "\n"
-#define RESULT_START "RESULT\n"
-#define RESULT_END "\nEND\n"
-#define SUCCESS_PREFIX "SUCCESS "
-#define FAILURE_PREFIX "FAILURE "
-#define ERROR_PREFIX "ERROR "
+// ==========================================
+// 1. Protocol Constants
+// ==========================================
+constexpr char PROTOCOL_VERSION[] = "1.0";
+constexpr char MSG_TERMINATOR[] = "\n";          // 消息结束符 (单换行)
+constexpr char RESULT_START[] = "RESULT\n";      // 查询结果起始标识
+constexpr char RESULT_END[] = "\nEND";           
+constexpr char SUCCESS_PREFIX[] = "SUCCESS ";    // 注意尾部空格
+constexpr char FAILURE_PREFIX[] = "FAILURE ";    // 注意尾部空格
+constexpr char ERROR_PREFIX[] = "ERROR ";       // 注意尾部空格
 
-// Command strings
+// ==========================================
+// 2. Command Strings
+// ==========================================
 #define CMD_LOGIN    "LOGIN"
 #define CMD_REGISTER "REGISTER"
 #define CMD_LOGOUT   "LOGOUT"
@@ -140,49 +144,23 @@
 #define QUERY_CLASSROOM  "CLASSROOM"
 #define QUERY_ADVANCED   "ADVANCED"
 
-/*
- * ============================================================
- *  Secure Communication Module (Bonus Feature)
- * ============================================================
- *  Encryption: XOR cipher with rotating key
- *  Key: "TIMETABLE2024" (12-byte rotating key)
- *
- *  How it works:
- *  1. Each byte of plaintext is XORed with a key byte
- *  2. Key rotates: key[i % key_length]
- *  3. XOR is symmetric: encrypt == decrypt
- *  4. Encrypted data is encoded as hex string for safe TCP transport
- *
- *  Security Level: Basic (suitable for student project demo)
- *  - XOR with rotating key is stronger than single-byte XOR
- *  - Not cryptographically secure, but demonstrates encryption concept
- *  - Prevents plaintext eavesdropping on the network
- *
- *  Protocol Extension:
- *  After connection, client sends: ENCRYPT <key_index>
- *  Server responds: ENCRYPT_OK
- *  All subsequent messages are encrypted
- *
- *  Example:
- *  Client -> Server: ENCRYPT 1
- *  Server -> Client: ENCRYPT_OK
- *  Client -> Server: <encrypted_hex>  (was: LOGIN admin admin123)
- *  Server -> Client: <encrypted_hex>  (was: SUCCESS Login successful)
- * ============================================================
- */
-
+// ==========================================
+// 3. Secure Communication Module
+// ==========================================
 #include <string>
 #include <sstream>
 #include <iomanip>
+#include <cctype>
+#include <cstdlib>
 
 // Encryption key (12 bytes, rotating)
-const std::string ENCRYPT_KEY = "TIMETABLE2024";
+constexpr char ENCRYPT_KEY[] = "TIMETABLE2024";
 
 // XOR encrypt/decrypt (symmetric)
 inline std::string xorEncryptDecrypt(const std::string& data) {
     std::string result = data;
     for (size_t i = 0; i < result.size(); i++) {
-        result[i] ^= ENCRYPT_KEY[i % ENCRYPT_KEY.size()];
+        result[i] ^= ENCRYPT_KEY[i % (sizeof(ENCRYPT_KEY) - 1)]; // 安全处理数组边界
     }
     return result;
 }
@@ -192,17 +170,28 @@ inline std::string toHex(const std::string& data) {
     std::stringstream ss;
     ss << std::hex << std::setfill('0');
     for (unsigned char c : data) {
-        ss << std::setw(2) << (int)c;
+        ss << std::setw(2) << static_cast<int>(c);
     }
     return ss.str();
 }
 
-// Convert hex string back to binary string
+// Convert hex string back to binary string (严格校验)
 inline std::string fromHex(const std::string& hex) {
+    // 1. 检查长度是否为偶数
+    if (hex.size() % 2 != 0) {
+        return ""; // 无效hex
+    }
+    // 2. 检查所有字符是否为十六进制
+    for (char c : hex) {
+        if (!std::isxdigit(static_cast<unsigned char>(c))) {
+            return ""; // 非法字符
+        }
+    }
+    // 3. 安全转换
     std::string result;
     for (size_t i = 0; i < hex.length(); i += 2) {
         std::string byte = hex.substr(i, 2);
-        char c = (char)strtol(byte.c_str(), NULL, 16);
+        char c = static_cast<char>(std::strtol(byte.c_str(), nullptr, 16));
         result += c;
     }
     return result;
@@ -214,20 +203,57 @@ inline std::string encryptMessage(const std::string& plaintext) {
     return toHex(xored);
 }
 
-// Decrypt a received message: Hex -> XOR
+// Decrypt a received message: Hex -> XOR (严格校验)
 inline std::string decryptMessage(const std::string& ciphertext) {
     std::string raw = fromHex(ciphertext);
+    if (raw.empty()) {
+        return ""; // 解密失败
+    }
     return xorEncryptDecrypt(raw);
 }
 
-// Check if a string looks like encrypted hex data
-inline bool isEncrypted(const std::string& data) {
-    if (data.length() < 4) return false;
-    for (char c : data) {
-        if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')))
-            return false;
+// Check if a message is encrypted (hex-encoded ciphertext)
+inline bool isEncrypted(const std::string& msg) {
+    if (msg.empty() || msg.size() % 2 != 0) return false;
+    for (char c : msg) {
+        if (!std::isxdigit(static_cast<unsigned char>(c))) return false;
     }
     return true;
+}
+
+// ==========================================
+// 4. Critical Fix: Safe Command Builder 
+// ==========================================
+#include <vector>
+
+/**
+ * @brief 安全生成查询命令 (避免手动拼接空格错误)
+ * @param type 查询类型 (如 QUERY_CODE)
+ * @param args 参数列表 (如 {"CS101"})
+ * @return 完整命令字符串 (例: "QUERY CODE CS101")
+ */
+inline std::string makeQueryCommand(const std::string& type, const std::vector<std::string>& args = {}) {
+    std::ostringstream oss;
+    oss << "QUERY " << type; //确保 QUERY 和类型间有空格
+    for (const auto& arg : args) {
+        oss << " " << arg; //
+    }
+    return oss.str();
+}
+
+/**
+ * @brief 安全生成管理命令 (ADD/UPDATE/DELETE)
+ * @param command 基础命令 (如 CMD_ADD)
+ * @param args 参数列表
+ * @return 完整命令字符串 (例: "ADD CS101 Math 01 ProfX ...")
+ */
+inline std::string makeAdminCommand(const std::string& command, const std::vector<std::string>& args) {
+    std::ostringstream oss;
+    oss << command;
+    for (const auto& arg : args) {
+        oss << " " << arg;
+    }
+    return oss.str();
 }
 
 #endif // PROTOCOL_H
