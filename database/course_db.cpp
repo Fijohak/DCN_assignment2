@@ -129,11 +129,6 @@ std::vector<Course> CourseDB::queryBySemester(const std::string& semester) const
     return result;
 }
 
-std::vector<Course> CourseDB::getAllCourses() const {
-    std::lock_guard<std::mutex> lock(dbMutex);
-    return courses;
-}
-
 bool CourseDB::addCourse(const Course& course) {
     std::lock_guard<std::mutex> lock(dbMutex);
 

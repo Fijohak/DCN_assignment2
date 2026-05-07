@@ -29,7 +29,6 @@ public:
     std::vector<Course> queryByCourseCode(const std::string& code) const;
     std::vector<Course> queryByInstructor(const std::string& instructor) const;
     std::vector<Course> queryBySemester(const std::string& semester) const;
-    std::vector<Course> getAllCourses() const;
 
     bool addCourse(const Course& course);
     bool updateCourseField(const std::string& code,
