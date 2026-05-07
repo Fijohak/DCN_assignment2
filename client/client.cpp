@@ -277,8 +277,58 @@ void cleanupWinsock() {
     }
 }
 
-int main() {
+// Quick-list mode: connect, fetch all courses, print, and exit.
+// Usage: timetable_client.exe --list [ip] [port]
+int quickListCourses(const std::string& ip, int port) {
+    NetworkClient client;
+    if (!client.connect(ip, port)) {
+        std::cerr << "Connection failed" << std::endl;
+        return 1;
+    }
+
+    std::string response = client.sendRequest("LIST_ALL");
+    client.disconnect();
+
+    if (response.empty()) {
+        std::cerr << "No response from server" << std::endl;
+        return 1;
+    }
+
+    // Parse the RESULT count=N\r\n...\r\nEND\r\n format
+    std::istringstream stream(response);
+    std::string line;
+    while (std::getline(stream, line)) {
+        if (!line.empty() && line.back() == '\r')
+            line.pop_back();
+        if (line.empty() || line == "END" || line.find("RESULT") == 0)
+            continue;
+        // Replace pipe delimiters with spaced columns for readability
+        std::cout << line << '\n';
+    }
+    return 0;
+}
+
+int main(int argc, char* argv[]) {
+    // Handle --list flag: non-interactive mode, prints all courses and exits
+    bool listMode = false;
+    std::string listIp = "127.0.0.1";
+    int listPort = 8888;
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "--list") {
+            listMode = true;
+            if (i + 1 < argc && argv[i + 1][0] != '-') listIp = argv[++i];
+            if (i + 1 < argc && argv[i + 1][0] != '-') listPort = std::stoi(argv[++i]);
+        }
+    }
+
     if (initializeWinsock() != 0) return 1;
+
+    if (listMode) {
+        int rc = quickListCourses(listIp, listPort);
+        cleanupWinsock();
+        return rc;
+    }
 
     NetworkClient client;
     ClientSession session;

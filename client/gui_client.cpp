@@ -79,6 +79,7 @@ void clearClientCache() { g_clientCache.clear(); }
 #define ID_EDIT_NEWVAL        2011
 #define ID_COMBO_FIELD        4001
 #define ID_LIST_RESULT        3001
+#define ID_BTN_REFRESH        1014
 #define ID_STATIC_STATUS      5001
 
 // ==================== Helpers ====================
@@ -132,7 +133,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     static HWND hBtnConnect, hBtnLogin, hBtnRegister, hBtnLogout;
     static HWND hBtnSearchCode, hBtnSearchInst, hBtnViewAll;
     static HWND hBtnSearchTime, hBtnSearchTitle, hBtnSearchRoom;
-    static HWND hBtnAdd, hBtnUpdate, hBtnDelete;
+    static HWND hBtnAdd, hBtnUpdate, hBtnDelete, hBtnRefresh;
     static HWND hTitle;
     static HWND hLabelCode, hLabelTitle, hLabelSec, hLabelInst, hLabelTime, hLabelRoom;
     static HWND hLabelAdminPanel, hLabelUpdateField, hLabelNewVal;
@@ -174,6 +175,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
             m + 200, 48, 80, 24, hWnd, (HMENU)ID_BTN_CONNECT, NULL, NULL);
         SendMessageA(hBtnConnect, WM_SETFONT, (WPARAM)hFontBold, TRUE);
+
+        // Refresh button — re-fetches all courses from server
+        hBtnRefresh = CreateWindowA("BUTTON", "Refresh",
+            WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+            m + 290, 48, 70, 24, hWnd, (HMENU)ID_BTN_REFRESH, NULL, NULL);
+        SendMessageA(hBtnRefresh, WM_SETFONT, (WPARAM)hFontNormal, TRUE);
 
         // Login row
         hLabelUser = CreateWindowA("STATIC", "User:", WS_CHILD | WS_VISIBLE,
@@ -337,6 +344,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         EnableWindow(hBtnSearchTime, FALSE);
         EnableWindow(hBtnSearchTitle, FALSE);
         EnableWindow(hBtnSearchRoom, FALSE);
+        EnableWindow(hBtnRefresh, FALSE);
         EnableWindow(hEditSearch, FALSE);
         EnableWindow(hEditUsername, FALSE);
         EnableWindow(hEditPassword, FALSE);
@@ -366,6 +374,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         if (addrW < 80) addrW = 80;
         MoveWindow(hEditServer, m + 55, 48, addrW, 24, TRUE);
         MoveWindow(hBtnConnect, m + 55 + addrW + 10, 48, 80, 24, TRUE);
+        MoveWindow(hBtnRefresh, m + 55 + addrW + 10 + 80 + 10, 48, 70, 24, TRUE);
 
         int rightX = w - m;
         MoveWindow(hBtnRegister, rightX - 45, 48, 45, 24, TRUE);
@@ -482,6 +491,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 EnableWindow(hBtnSearchTime, TRUE);
                 EnableWindow(hBtnSearchTitle, TRUE);
                 EnableWindow(hBtnSearchRoom, TRUE);
+                EnableWindow(hBtnRefresh, TRUE);
                 EnableWindow(hEditSearch, TRUE);
                 EnableWindow(hEditUsername, TRUE);
                 EnableWindow(hEditPassword, TRUE);
@@ -540,6 +550,18 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     appendListBox(hListBox, "Use the Admin Panel below to manage courses.");
                 } else {
                     appendListBox(hListBox, "You have STUDENT access (query only).");
+                }
+                // Auto-load all courses after login
+                {
+                    std::string resp = g_client.sendRequest("LIST_ALL");
+                    std::string clean = cleanResponse(resp);
+                    if (!clean.empty() && clean.find("Error") != 0) {
+                        appendListBox(hListBox, "--- All Courses ---");
+                        appendListBoxText(hListBox, clean);
+                        SetWindowTextA(hStaticStatus,
+                            ("Logged in as " + username + " (" +
+                             (g_isAdmin ? "Admin" : "Student") + ") - Courses loaded").c_str());
+                    }
                 }
             } else {
                 std::string clean = cleanResponse(response);
@@ -662,6 +684,20 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 appendListBox(hListBox, "=== All Courses ===");
                 appendListBoxText(hListBox, clean);
                 SetWindowTextA(hStaticStatus, "Showing all courses");
+            }
+        }
+        else if (id == ID_BTN_REFRESH) {
+            std::string response = g_client.sendRequest("LIST_ALL");
+            if (response.find(ERROR_PREFIX) == 0 || response.find(FAILURE_PREFIX) == 0) {
+                SetWindowTextA(hStaticStatus, ("Error: " + cleanResponse(response)).c_str());
+                appendListBox(hListBox, "Error: " + cleanResponse(response));
+            } else {
+                std::string clean = cleanResponse(response);
+                clearClientCache();
+                clearListBox(hListBox);
+                appendListBox(hListBox, "=== All Courses (Refreshed) ===");
+                appendListBoxText(hListBox, clean);
+                SetWindowTextA(hStaticStatus, "Courses refreshed");
             }
         }
         else if (id == ID_BTN_SEARCH_TIME) {
