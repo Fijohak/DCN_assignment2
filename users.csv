@@ -1,0 +1,6 @@
+username,account,password,role
+Alice,stu1001,123456,student
+Alice,stu1002,abc123,student
+Admin,root,admin123,admin
+Alice,alice001,123456,student
+Alice,alice002,abc123,student
