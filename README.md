@@ -51,7 +51,7 @@ make
 ```bash
 timetable_server.exe
 ```
-服务器默认监听端口 **8888**，支持最多 **10** 个并发客户端连接。
+服务器默认监听端口 **54000**，支持最多 **10** 个并发客户端连接。
 
 **3. 启动客户端：**
 - **CMD 客户端**：`timetable_client.exe`（输入服务器 IP 和端口）
@@ -95,7 +95,7 @@ As_2/
 | 学生 | `student` | `student123` | 仅查询 |
 | 管理员 | `admin` | `admin123` | 查询 + 增删改 |
 
-> **新用户注册**：在客户端主菜单中选择 "2. Register" 即可注册新账号（默认注册为学生角色）。用户数据存储在 `data/users.csv` 文件中，服务器重启后仍然保留。
+> **新用户注册**：在客户端主菜单中选择 "2. Register" 即可注册新账号（默认注册为学生角色）。用户数据存储在 `database/users.csv` 文件中，服务器重启后仍然保留。
 
 ---
 
@@ -106,7 +106,7 @@ As_2/
 ```
 === Course Timetable Client ===
 Server IP (default: 127.0.0.1):          ← 回车使用默认
-Port (default: 8888):                    ← 回车使用默认
+Port (default: 54000):                    ← 回车使用默认
 
 --- Main Menu ---
 1. Login                                  ← 登录
@@ -132,7 +132,7 @@ COMP3003 | Data Communications and Networking | Sec 2 | Dr. Johnson | Wed-14:00-
 ### GUI 客户端使用流程
 
 **1. 连接服务器：**
-- 在 "Server" 输入框输入 `127.0.0.1:8888`
+- 在 "Server" 输入框输入 `127.0.0.1:54000`
 - 点击 **Connect** 按钮
 
 **2. 登录/注册：**
@@ -344,7 +344,7 @@ Transport: TCP, Encoding: ASCII text
 ================================
 [2026-05-06 17:24:48] Loaded 10 courses from database
 [2026-05-06 17:24:48] Loaded 5 users from database
-Server running on port 8888
+Server running on port 54000
 Press Ctrl+C to stop
 ```
 

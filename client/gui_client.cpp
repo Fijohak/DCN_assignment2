@@ -157,7 +157,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         // Connection row
         CreateWindowA("STATIC", "Server:", WS_CHILD | WS_VISIBLE,
             m, 50, 50, 22, hWnd, NULL, NULL, NULL);
-        hEditServer = CreateWindowA("EDIT", "127.0.0.1:8888",
+        hEditServer = CreateWindowA("EDIT", "127.0.0.1:54000",
             WS_CHILD | WS_VISIBLE | WS_BORDER | ES_LEFT,
             m + 55, 48, 200, 24, hWnd, (HMENU)ID_EDIT_SERVER, NULL, NULL);
         SendMessageA(hEditServer, WM_SETFONT, (WPARAM)hFontNormal, TRUE);

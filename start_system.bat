@@ -41,7 +41,7 @@ if "%choice%"=="1" (
 )
 
 :: 启动服务器（新窗口）
-echo [1/2] Starting server on port 8888...
+echo [1/2] Starting server on port 54000...
 start "Timetable Server" /MIN timetable_server.exe
 
 :: 等待服务器启动

@@ -101,7 +101,7 @@ int main(int argc, char* argv[]) {
     // Parse --list flag
     bool listMode = false;
     std::string listIp = "127.0.0.1";
-    int listPort = 8888;
+    int listPort = 54000;
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
         if (arg == "--list") {
@@ -125,7 +125,7 @@ int main(int argc, char* argv[]) {
     bool isAdmin = false;
 
     std::string ip = "127.0.0.1";
-    int port = 8888;
+    int port = 54000;
 
     std::cout << "=== Course Timetable Client ===\n";
     std::cout << "Server IP (default: 127.0.0.1): ";
@@ -133,7 +133,7 @@ int main(int argc, char* argv[]) {
     std::getline(std::cin, userInput);
     if (!userInput.empty()) ip = userInput;
 
-    std::cout << "Port (default: 8888): ";
+    std::cout << "Port (default: 54000): ";
     std::getline(std::cin, userInput);
     if (!userInput.empty()) {
         try { port = std::stoi(userInput); }
