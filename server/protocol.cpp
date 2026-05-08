@@ -50,6 +50,17 @@ Request Protocol::parseRequest(const std::string& line) {
         } else {
             request.type = CommandType::Invalid;
         }
+    } else if (command == "REGISTER") {
+        request.type = CommandType::Register;
+        std::istringstream iss(rest);
+        std::string username;
+        std::string password;
+        if (iss >> username >> password) {
+            request.fields.push_back(username);
+            request.fields.push_back(password);
+        } else {
+            request.type = CommandType::Invalid;
+        }
     } else if (command == "ADD") {
         request.fields = splitPipe(rest);
         request.type = request.fields.size() == 9 ? CommandType::Add : CommandType::Invalid;
@@ -99,7 +110,8 @@ std::string Protocol::formatCourse(const Course& course) {
 std::string Protocol::helpText() {
     return "OK Commands: PING, HELP, LIST_ALL, QUERY_CODE <course_code>, "
            "QUERY_INSTRUCTOR <instructor>, QUERY_SEMESTER <semester>, "
-           "LOGIN <username> <password>, ADD <9 pipe fields>, "
+           "LOGIN <username> <password>, REGISTER <username> <password>, "
+           "ADD <9 pipe fields>, "
            "UPDATE <code>|<section>|<field>|<new_value>, DELETE <code>|<section>, "
            "ENCRYPT <data>|<key>, QUIT\r\n";
 }

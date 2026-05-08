@@ -1,300 +1,39 @@
+// Course Timetable System - Console Client
+// Usage: timetable_client.exe [--list [ip] [port]]
+
 #include <iostream>
 #include <string>
-#include <vector>
+#include <sstream>
 #include <winsock2.h>
 #include <ws2tcpip.h>
-#include <iomanip>
-#include <sstream>
-#include <stdexcept>
-#include <map>
-#include <ctime>
 #include "../include/protocol.h"
-#include "../include/common.h"
 #include "../include/network_client.h"
 
-// Global Winsock state
-WSADATA wsaData;
-bool wsaInitialized = false;
+// ==================== Helpers ====================
 
-std::string escapeInput(const std::string& input) {
-    std::string result;
-    for (char c : input) {
-        if (c == '\r' || c == '\n' || c == '\\') {
-            result += '\\';
-        }
-        result += c;
-    }
-    return result;
+// Strip response prefixes and trailing \r\n for display.
+std::string cleanResponse(const std::string& response) {
+    std::string display = response;
+
+    // Strip known prefixes
+    if (display.find(OK_PREFIX) == 0)
+        display = display.substr(strlen(OK_PREFIX));
+    else if (display.find(SUCCESS_PREFIX) == 0)
+        display = display.substr(strlen(SUCCESS_PREFIX));
+    else if (display.find(FAILURE_PREFIX) == 0)
+        display = display.substr(strlen(FAILURE_PREFIX));
+    else if (display.find(ERROR_PREFIX) == 0)
+        display = display.substr(strlen(ERROR_PREFIX));
+
+    // Strip trailing \r\n
+    while (!display.empty() && (display.back() == '\n' || display.back() == '\r'))
+        display.pop_back();
+
+    return display;
 }
 
-enum class Role { STUDENT, ADMIN };
-
-class ClientSession {
-private:
-    bool m_loggedIn;
-    std::string m_username;
-    Role m_role;
-
-    struct CacheEntry {
-        std::string result;
-        time_t timestamp;
-    };
-    std::map<std::string, CacheEntry> m_cache;
-    static const int CACHE_TTL = 15;
-
-public:
-    ClientSession() : m_loggedIn(false), m_role(Role::STUDENT) {}
-
-    bool isLoggedIn() const { return m_loggedIn; }
-    void login(const std::string& username, Role role) {
-        m_loggedIn = true;
-        m_username = username;
-        m_role = role;
-    }
-    void logout() {
-        m_loggedIn = false;
-        m_username.clear();
-        m_role = Role::STUDENT;
-        clearCache();
-    }
-    std::string getUsername() const { return m_username; }
-    Role getRole() const { return m_role; }
-
-    std::string getCached(const std::string& key) {
-        auto it = m_cache.find(key);
-        if (it != m_cache.end()) {
-            time_t now = time(0);
-            if (difftime(now, it->second.timestamp) < CACHE_TTL) {
-                return it->second.result;
-            }
-            m_cache.erase(it);
-        }
-        return "";
-    }
-
-    void setCache(const std::string& key, const std::string& result) {
-        CacheEntry entry;
-        entry.result = result;
-        entry.timestamp = time(0);
-        m_cache[key] = entry;
-    }
-
-    void clearCache() { m_cache.clear(); }
-};
-
-class CourseBrowser {
-private:
-    NetworkClient& m_client;
-    ClientSession& m_session;
-
-    bool isError(const std::string& response) {
-        return response.find(ERROR_PREFIX) == 0 ||
-               response.find(FAILURE_PREFIX) == 0;
-    }
-
-    void showError(const std::string& response) {
-        std::string msg = response;
-        if (msg.find(ERROR_PREFIX) == 0)
-            msg = msg.substr(strlen(ERROR_PREFIX));
-        else if (msg.find(FAILURE_PREFIX) == 0)
-            msg = msg.substr(strlen(FAILURE_PREFIX));
-        // Trim trailing newline
-        if (!msg.empty() && msg.back() == '\n') msg.pop_back();
-        std::cout << "Error: " << msg << std::endl;
-    }
-
-public:
-    CourseBrowser(NetworkClient& client, ClientSession& session)
-        : m_client(client), m_session(session) {}
-
-    bool searchByCode(const std::string& code) {
-        std::string cacheKey = std::string(CMD_QUERY) + " " + QUERY_CODE + " " + code;
-        std::string cached = m_session.getCached(cacheKey);
-
-        if (!cached.empty()) {
-            std::cout << cached;
-            return true;
-        }
-
-        std::string response = m_client.sendRequest(cacheKey);
-        if (isError(response)) {
-            showError(response);
-            return false;
-        }
-        std::cout << response;
-        m_session.setCache(cacheKey, response);
-        return true;
-    }
-
-    bool searchByInstructor(const std::string& instructor) {
-        std::string cacheKey = std::string(CMD_QUERY) + " " + QUERY_INSTRUCTOR + " " + instructor;
-        std::string cached = m_session.getCached(cacheKey);
-
-        if (!cached.empty()) {
-            std::cout << cached;
-            return true;
-        }
-
-        std::string response = m_client.sendRequest(cacheKey);
-        if (isError(response)) {
-            showError(response);
-            return false;
-        }
-        std::cout << response;
-        m_session.setCache(cacheKey, response);
-        return true;
-    }
-
-    bool viewAllCourses() {
-        std::string response = m_client.sendRequest(
-            std::string(CMD_QUERY) + " " + QUERY_ALL);
-        if (isError(response)) {
-            showError(response);
-            return false;
-        }
-        std::cout << response;
-        return true;
-    }
-
-    bool searchByTime(const std::string& keyword) {
-        std::string response = m_client.sendRequest(
-            std::string(CMD_QUERY) + " " + QUERY_TIME + " " + keyword);
-        if (isError(response)) {
-            showError(response);
-            return false;
-        }
-        std::cout << response;
-        return true;
-    }
-
-    bool searchByTitle(const std::string& keyword) {
-        std::string response = m_client.sendRequest(
-            std::string(CMD_QUERY) + " " + QUERY_TITLE + " " + keyword);
-        if (isError(response)) {
-            showError(response);
-            return false;
-        }
-        std::cout << response;
-        return true;
-    }
-
-    bool searchByClassroom(const std::string& room) {
-        std::string response = m_client.sendRequest(
-            std::string(CMD_QUERY) + " " + QUERY_CLASSROOM + " " + room);
-        if (isError(response)) {
-            showError(response);
-            return false;
-        }
-        std::cout << response;
-        return true;
-    }
-
-    bool advancedSearch(const std::string& field, const std::string& op,
-                        const std::string& value) {
-        std::string response = m_client.sendRequest(
-            std::string(CMD_QUERY) + " " + QUERY_ADVANCED + " " +
-            field + " " + op + " " + value);
-        if (isError(response)) {
-            showError(response);
-            return false;
-        }
-        std::cout << response;
-        return true;
-    }
-
-    bool addCourse(const std::string& code, const std::string& title,
-                   const std::string& section, const std::string& instructor,
-                   const std::string& time, const std::string& classroom) {
-        if (m_session.getRole() != Role::ADMIN) {
-            std::cout << "Error: Admin privileges required\n";
-            return false;
-        }
-        std::string response = m_client.sendRequest(
-            std::string(CMD_ADD) + " " + escapeInput(code) + " " +
-            escapeInput(title) + " " + escapeInput(section) + " " +
-            escapeInput(instructor) + " " + escapeInput(time) + " " +
-            escapeInput(classroom));
-        if (isError(response)) {
-            showError(response);
-            return false;
-        }
-        std::cout << response;
-        m_session.clearCache();
-        return true;
-    }
-
-    bool updateCourse(const std::string& code, const std::string& section,
-                      const std::string& field, const std::string& newValue) {
-        if (m_session.getRole() != Role::ADMIN) {
-            std::cout << "Error: Admin privileges required\n";
-            return false;
-        }
-        std::string response = m_client.sendRequest(
-            std::string(CMD_UPDATE) + " " + escapeInput(code) + " " +
-            escapeInput(section) + " " + escapeInput(field) + " " +
-            escapeInput(newValue));
-        if (isError(response)) {
-            showError(response);
-            return false;
-        }
-        std::cout << response;
-        m_session.clearCache();
-        return true;
-    }
-
-    bool deleteCourse(const std::string& code, const std::string& section) {
-        if (m_session.getRole() != Role::ADMIN) {
-            std::cout << "Error: Admin privileges required\n";
-            return false;
-        }
-        std::string response = m_client.sendRequest(
-            std::string(CMD_DELETE) + " " + escapeInput(code) + " " +
-            escapeInput(section));
-        if (isError(response)) {
-            showError(response);
-            return false;
-        }
-        std::cout << response;
-        m_session.clearCache();
-        return true;
-    }
-};
-
-int initializeWinsock() {
-    int result = WSAStartup(MAKEWORD(2, 2), &wsaData);
-    if (result != 0) {
-        std::cerr << "WSAStartup failed: " << result << std::endl;
-        return result;
-    }
-    wsaInitialized = true;
-    return 0;
-}
-
-void cleanupWinsock() {
-    if (wsaInitialized) {
-        WSACleanup();
-        wsaInitialized = false;
-    }
-}
-
-// Quick-list mode: connect, fetch all courses, print, and exit.
-// Usage: timetable_client.exe --list [ip] [port]
-int quickListCourses(const std::string& ip, int port) {
-    NetworkClient client;
-    if (!client.connect(ip, port)) {
-        std::cerr << "Connection failed" << std::endl;
-        return 1;
-    }
-
-    std::string response = client.sendRequest("LIST_ALL");
-    client.disconnect();
-
-    if (response.empty()) {
-        std::cerr << "No response from server" << std::endl;
-        return 1;
-    }
-
-    // Parse the RESULT count=N\r\n...\r\nEND\r\n format
+// Print a multi-line RESULT response, parsing out the count header and END footer.
+void printResult(const std::string& response) {
     std::istringstream stream(response);
     std::string line;
     while (std::getline(stream, line)) {
@@ -302,14 +41,64 @@ int quickListCourses(const std::string& ip, int port) {
             line.pop_back();
         if (line.empty() || line == "END" || line.find("RESULT") == 0)
             continue;
-        // Replace pipe delimiters with spaced columns for readability
         std::cout << line << '\n';
+    }
+}
+
+bool isError(const std::string& response) {
+    return response.find(ERROR_PREFIX) == 0 ||
+           response.find(FAILURE_PREFIX) == 0;
+}
+
+// ==================== Winsock ====================
+
+int initializeWinsock() {
+    WSADATA wsaData;
+    int result = WSAStartup(MAKEWORD(2, 2), &wsaData);
+    if (result != 0) {
+        std::cerr << "WSAStartup failed: " << result << std::endl;
+        return result;
     }
     return 0;
 }
 
+void cleanupWinsock() {
+    WSACleanup();
+}
+
+// ==================== --list mode ====================
+
+int quickListCourses(const std::string& ip, int port) {
+    NetworkClient client;
+    if (!client.connect(ip, port)) {
+        std::cerr << "Connection failed" << std::endl;
+        return 1;
+    }
+
+    // Auto-login as student for --list mode
+    std::string loginResp = client.sendRequest(
+        std::string(CMD_LOGIN) + " student student123");
+    if (loginResp.find(SUCCESS_PREFIX) != 0) {
+        std::cerr << "Auto-login failed for --list mode" << std::endl;
+        client.disconnect();
+        return 1;
+    }
+
+    std::string response = client.sendRequest(CMD_LIST_ALL);
+    client.disconnect();
+
+    if (response.empty()) {
+        std::cerr << "No response from server" << std::endl;
+        return 1;
+    }
+    printResult(response);
+    return 0;
+}
+
+// ==================== Main ====================
+
 int main(int argc, char* argv[]) {
-    // Handle --list flag: non-interactive mode, prints all courses and exits
+    // Parse --list flag
     bool listMode = false;
     std::string listIp = "127.0.0.1";
     int listPort = 8888;
@@ -330,9 +119,10 @@ int main(int argc, char* argv[]) {
         return rc;
     }
 
+    // ==================== Interactive mode ====================
     NetworkClient client;
-    ClientSession session;
-    CourseBrowser browser(client, session);
+    bool loggedIn = false;
+    bool isAdmin = false;
 
     std::string ip = "127.0.0.1";
     int port = 8888;
@@ -356,36 +146,25 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    // Display welcome message (empty request returns stored welcome)
+    // Show welcome
     std::string welcome = client.sendRequest("");
     if (!welcome.empty()) {
-        std::cout << "\n" << welcome;
+        std::cout << "\n" << cleanResponse(welcome) << "\n";
     }
 
+    // Main loop
     while (true) {
         if (!client.isConnected()) {
-            std::cout << "\n*** Connection lost. Reconnecting... ***\n";
-            for (int attempt = 0; attempt < 3; ++attempt) {
-                std::cout << "Attempt " << (attempt + 1) << "/3...\n";
-                if (client.connect(ip, port)) {
-                    std::cout << "Reconnected!\n";
-                    // Re-login if was logged in
-                    session.logout();
-                    break;
-                }
-                std::cout << "Failed. Retrying in 2s...\n";
-                Sleep(2000);
-            }
-            if (!client.isConnected()) {
-                std::cout << "Failed to reconnect. Exiting.\n";
-                cleanupWinsock();
-                return 1;
-            }
+            std::cout << "\nConnection lost. Exiting.\n";
+            break;
         }
 
-        if (!session.isLoggedIn()) {
+        if (!loggedIn) {
             std::cout << "\n--- Main Menu ---\n"
-                      << "1. Login\n2. Register\n3. Exit\nChoice: ";
+                      << "1. Login\n"
+                      << "2. Register\n"
+                      << "3. Quit\n"
+                      << "Choice: ";
             std::string choice;
             std::getline(std::cin, choice);
 
@@ -397,22 +176,13 @@ int main(int argc, char* argv[]) {
                 std::getline(std::cin, pwd);
 
                 std::string response = client.sendRequest(
-                    std::string(CMD_LOGIN) + " " + escapeInput(user) + " " + escapeInput(pwd));
-
+                    std::string(CMD_LOGIN) + " " + user + " " + pwd);
                 if (response.find(SUCCESS_PREFIX) == 0) {
-                    Role role = (response.find("Role: Admin") != std::string::npos)
-                                    ? Role::ADMIN : Role::STUDENT;
-                    session.login(user, role);
-                    std::cout << "SUCCESS Login successful. Role: "
-                              << (role == Role::ADMIN ? "Admin" : "Student") << "\n";
-                    std::cout << "Logged in as "
-                              << (role == Role::ADMIN ? "Administrator" : "Student") << "\n";
+                    loggedIn = true;
+                    isAdmin = (response.find("Role: Admin") != std::string::npos);
+                    std::cout << "Login successful (" << (isAdmin ? "Admin" : "Student") << ")\n";
                 } else {
-                    std::string msg = response;
-                    if (msg.find(FAILURE_PREFIX) == 0)
-                        msg = msg.substr(strlen(FAILURE_PREFIX));
-                    if (!msg.empty() && msg.back() == '\n') msg.pop_back();
-                    std::cout << "Login failed: " << msg << std::endl;
+                    std::cout << "Login failed: " << cleanResponse(response) << "\n";
                 }
             } else if (choice == "2") {
                 std::string user, pwd;
@@ -422,16 +192,15 @@ int main(int argc, char* argv[]) {
                 std::getline(std::cin, pwd);
 
                 std::string response = client.sendRequest(
-                    std::string(CMD_REGISTER) + " " + escapeInput(user) + " " + escapeInput(pwd));
-
+                    std::string(CMD_REGISTER) + " " + user + " " + pwd);
                 if (response.find(SUCCESS_PREFIX) == 0) {
-                    std::cout << response;
+                    // Auto-login after successful registration
+                    loggedIn = true;
+                    isAdmin = (response.find("Role: Admin") != std::string::npos);
+                    std::cout << "Registration successful. Auto-logged in as "
+                              << (isAdmin ? "Admin" : "Student") << "\n";
                 } else {
-                    std::string msg = response;
-                    if (msg.find(FAILURE_PREFIX) == 0)
-                        msg = msg.substr(strlen(FAILURE_PREFIX));
-                    if (!msg.empty() && msg.back() == '\n') msg.pop_back();
-                    std::cout << "Registration failed: " << msg << std::endl;
+                    std::cout << "Registration failed: " << cleanResponse(response) << "\n";
                 }
             } else if (choice == "3") {
                 break;
@@ -439,117 +208,131 @@ int main(int argc, char* argv[]) {
                 std::cout << "Invalid choice.\n";
             }
         } else {
-            bool isAdmin = (session.getRole() == Role::ADMIN);
-
-            // Display menu
+            // Role-based menu (logged in)
             if (isAdmin) {
-                std::cout << "\n--- Admin Menu ---\n";
+                std::cout << "\n--- Admin Menu ---\n"
+                          << "1. List All Courses\n"
+                          << "2. Search by Course Code\n"
+                          << "3. Search by Instructor\n"
+                          << "4. Search by Semester\n"
+                          << "5. Add Course\n"
+                          << "6. Update Course\n"
+                          << "7. Delete Course\n"
+                          << "8. Logout\n";
             } else {
-                std::cout << "\n--- Student Menu ---\n";
+                std::cout << "\n--- Student Menu ---\n"
+                          << "1. List All Courses\n"
+                          << "2. Search by Course Code\n"
+                          << "3. Search by Instructor\n"
+                          << "4. Search by Semester\n"
+                          << "5. Logout\n";
             }
-            std::cout << "1. Search by Course Code\n"
-                      << "2. Search by Instructor\n"
-                      << "3. View All Courses\n"
-                      << "4. Search by Time\n"
-                      << "5. Search by Title\n"
-                      << "6. Search by Classroom\n"
-                      << "7. Advanced Search\n";
-
-            if (isAdmin) {
-                std::cout << "8. Add Course\n"
-                          << "9. Update Course\n"
-                          << "10. Delete Course\n"
-                          << "11. Logout\nChoice: ";
-            } else {
-                std::cout << "8. Logout\nChoice: ";
-            }
-
+            std::cout << "Choice: ";
             std::string choice;
             std::getline(std::cin, choice);
 
             if (choice == "1") {
+                std::string response = client.sendRequest(CMD_LIST_ALL);
+                if (isError(response))
+                    std::cout << "Error: " << cleanResponse(response) << "\n";
+                else
+                    printResult(response);
+            } else if (choice == "2") {
                 std::string code;
                 std::cout << "Course Code: ";
                 std::getline(std::cin, code);
-                browser.searchByCode(code);
-            } else if (choice == "2") {
-                std::string instructor;
-                std::cout << "Instructor Name: ";
-                std::getline(std::cin, instructor);
-                browser.searchByInstructor(instructor);
+                std::string response = client.sendRequest(
+                    std::string(CMD_QUERY_CODE) + " " + code);
+                if (isError(response))
+                    std::cout << "Error: " << cleanResponse(response) << "\n";
+                else
+                    printResult(response);
             } else if (choice == "3") {
-                browser.viewAllCourses();
+                std::string name;
+                std::cout << "Instructor Name: ";
+                std::getline(std::cin, name);
+                std::string response = client.sendRequest(
+                    std::string(CMD_QUERY_INSTRUCTOR) + " " + name);
+                if (isError(response))
+                    std::cout << "Error: " << cleanResponse(response) << "\n";
+                else
+                    printResult(response);
             } else if (choice == "4") {
-                std::string keyword;
-                std::cout << "Time (e.g., Mon, 10:00): ";
-                std::getline(std::cin, keyword);
-                browser.searchByTime(keyword);
-            } else if (choice == "5") {
-                std::string keyword;
-                std::cout << "Title keyword: ";
-                std::getline(std::cin, keyword);
-                browser.searchByTitle(keyword);
-            } else if (choice == "6") {
-                std::string room;
+                std::string sem;
+                std::cout << "Semester (e.g. 2026 Spring): ";
+                std::getline(std::cin, sem);
+                std::string response = client.sendRequest(
+                    std::string(CMD_QUERY_SEMESTER) + " " + sem);
+                if (isError(response))
+                    std::cout << "Error: " << cleanResponse(response) << "\n";
+                else
+                    printResult(response);
+            } else if (choice == "5" && !isAdmin) {
+                // Student logout
+                loggedIn = false;
+                isAdmin = false;
+                std::cout << "Logged out.\n";
+            } else if (choice == "5" && isAdmin) {
+                // ADD uses 9 pipe-separated fields (admin only)
+                std::string semester, code, title, section, instructor;
+                std::string day, startTime, endTime, classroom;
+                std::cout << "Semester (e.g. 2026 Spring): ";
+                std::getline(std::cin, semester);
+                std::cout << "Course Code: ";
+                std::getline(std::cin, code);
+                std::cout << "Title: ";
+                std::getline(std::cin, title);
+                std::cout << "Section: ";
+                std::getline(std::cin, section);
+                std::cout << "Instructor: ";
+                std::getline(std::cin, instructor);
+                std::cout << "Day (e.g. Mon): ";
+                std::getline(std::cin, day);
+                std::cout << "Start Time (e.g. 10:00): ";
+                std::getline(std::cin, startTime);
+                std::cout << "End Time (e.g. 12:00): ";
+                std::getline(std::cin, endTime);
                 std::cout << "Classroom: ";
-                std::getline(std::cin, room);
-                browser.searchByClassroom(room);
-            } else if (choice == "7") {
-                std::string field, op, value;
-                std::cout << "Field (code/title/section/instructor/time/classroom): ";
-                std::getline(std::cin, field);
-                std::cout << "Operator (= eq / ~= contains / != ne / ^= startswith): ";
-                std::getline(std::cin, op);
-                std::cout << "Value: ";
-                std::getline(std::cin, value);
-                browser.advancedSearch(field, op, value);
-            } else if (choice == "8") {
-                if (isAdmin) {
-                    std::string code, title, section, instructor, tim, classroom;
-                    std::cout << "Course Code: ";
-                    std::getline(std::cin, code);
-                    std::cout << "Title: ";
-                    std::getline(std::cin, title);
-                    std::cout << "Section: ";
-                    std::getline(std::cin, section);
-                    std::cout << "Instructor: ";
-                    std::getline(std::cin, instructor);
-                    std::cout << "Time: ";
-                    std::getline(std::cin, tim);
-                    std::cout << "Classroom: ";
-                    std::getline(std::cin, classroom);
-                    browser.addCourse(code, title, section, instructor, tim, classroom);
-                } else {
-                    // Student logout
-                    client.sendRequest(std::string(CMD_LOGOUT));
-                    session.logout();
-                    std::cout << "Logged out successfully.\n";
-                }
-            } else if (choice == "9" && isAdmin) {
+                std::getline(std::cin, classroom);
+
+                std::string addCmd = std::string(CMD_ADD) + " " +
+                    semester + "|" + code + "|" + title + "|" + section + "|" +
+                    instructor + "|" + day + "|" + startTime + "|" + endTime + "|" + classroom;
+                std::string response = client.sendRequest(addCmd);
+                std::cout << cleanResponse(response) << "\n";
+            } else if (choice == "6" && isAdmin) {
+                // UPDATE uses 4 pipe-separated fields (admin only)
                 std::string code, section, field, newValue;
                 std::cout << "Course Code: ";
                 std::getline(std::cin, code);
                 std::cout << "Section: ";
                 std::getline(std::cin, section);
-                std::cout << "Field to update (title/instructor/time/classroom): ";
+                std::cout << "Field (COURSE_TITLE/INSTRUCTOR/TIME/CLASSROOM/DAY/SEMESTER): ";
                 std::getline(std::cin, field);
-                std::cout << "New value: ";
+                std::cout << "New Value: ";
                 std::getline(std::cin, newValue);
-                browser.updateCourse(code, section, field, newValue);
-            } else if (choice == "10" && isAdmin) {
+
+                std::string updCmd = std::string(CMD_UPDATE) + " " +
+                    code + "|" + section + "|" + field + "|" + newValue;
+                std::string response = client.sendRequest(updCmd);
+                std::cout << cleanResponse(response) << "\n";
+            } else if (choice == "7" && isAdmin) {
+                // DELETE uses 2 pipe-separated fields (admin only)
                 std::string code, section;
                 std::cout << "Course Code: ";
                 std::getline(std::cin, code);
                 std::cout << "Section: ";
                 std::getline(std::cin, section);
-                browser.deleteCourse(code, section);
-            } else if ((choice == "11" && isAdmin) || (choice == "8" && !isAdmin)) {
-                // Already handled student logout above
-                if (isAdmin) {
-                    client.sendRequest(std::string(CMD_LOGOUT));
-                    session.logout();
-                    std::cout << "Logged out successfully.\n";
-                }
+
+                std::string delCmd = std::string(CMD_DELETE) + " " +
+                    code + "|" + section;
+                std::string response = client.sendRequest(delCmd);
+                std::cout << cleanResponse(response) << "\n";
+            } else if (choice == "8" && isAdmin) {
+                // Admin logout
+                loggedIn = false;
+                isAdmin = false;
+                std::cout << "Logged out.\n";
             } else {
                 std::cout << "Invalid choice.\n";
             }

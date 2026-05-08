@@ -28,10 +28,10 @@ private:
     CourseDB& database;
     Logger& logger;
     std::string clientAddress;
-    bool adminLoggedIn;
-    bool encryptedMode;
-    std::string encryptionKey;
-    Auth auth;
+    bool loggedIn;
+    bool isAdmin;
+    std::string username;
+    Auth auth{"database/users.csv"};
 
     bool receiveLine(std::string& line);
     bool sendResponse(const std::string& response);

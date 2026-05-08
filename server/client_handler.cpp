@@ -1,3 +1,6 @@
+// ClientHandler - Processes a single client connection in its own thread.
+// Handles authentication, course queries, and admin CRUD operations.
+
 #include "client_handler.h"
 
 #ifdef _WIN32
@@ -10,6 +13,7 @@
 #include <sstream>
 #include <iomanip>
 
+// Converts raw bytes to a hex string (used by the ENCRYPT demo command).
 static std::string bytesToHex(const std::string& data) {
     std::ostringstream oss;
     for (std::size_t i = 0; i < data.size(); ++i) {
@@ -27,8 +31,8 @@ ClientHandler::ClientHandler(SOCKET clientSocket,
       database(database),
       logger(logger),
       clientAddress(clientAddress),
-      adminLoggedIn(false),
-      encryptedMode(false) {}
+      loggedIn(false),
+      isAdmin(false) {}
 
 void ClientHandler::operator()() {
     logger.info("Client connected: " + clientAddress);
@@ -113,34 +117,72 @@ std::string ClientHandler::handleCommand(const std::string& line, bool& shouldCl
             shouldClose = true;
             return "OK Goodbye\r\n";
 
+        // ---- Queries (require login) ----
         case CommandType::ListAll:
+            if (!loggedIn) return "ERROR Please login first\r\n";
             logger.info(clientAddress + " LIST_ALL");
             return Protocol::formatCourses(database.getAllCourses());
 
         case CommandType::QueryCode:
+            if (!loggedIn) return "ERROR Please login first\r\n";
             logger.info(clientAddress + " QUERY_CODE " + request.argument);
             return Protocol::formatCourses(database.queryByCourseCode(request.argument));
 
         case CommandType::QueryInstructor:
+            if (!loggedIn) return "ERROR Please login first\r\n";
             logger.info(clientAddress + " QUERY_INSTRUCTOR " + request.argument);
             return Protocol::formatCourses(database.queryByInstructor(request.argument));
 
         case CommandType::QuerySemester:
+            if (!loggedIn) return "ERROR Please login first\r\n";
             logger.info(clientAddress + " QUERY_SEMESTER " + request.argument);
             return Protocol::formatCourses(database.queryBySemester(request.argument));
 
-        case CommandType::Login:
-            if (auth.login(request.fields[0], request.fields[1])) {
-                adminLoggedIn = true;
-                logger.info(clientAddress + " admin login success");
-                return "SUCCESS Logged in\r\n";
+        // ---- Authentication ----
+        case CommandType::Login: {
+            if (request.fields.size() < 2)
+                return "FAILURE Usage: LOGIN <username> <password>\r\n";
+
+            Auth::LoginResult result = auth.login(request.fields[0], request.fields[1]);
+            if (!result.success) {
+                logger.error(clientAddress + " login failure: " + request.fields[0]);
+                return "FAILURE Invalid username or password\r\n";
             }
 
-            logger.error(clientAddress + " admin login failure");
-            return "FAILURE Invalid username or password\r\n";
+            loggedIn = true;
+            isAdmin = (result.role == UserRole::Admin);
+            username = request.fields[0];
+            logger.info(clientAddress + " login: " + username +
+                        (isAdmin ? " (Admin)" : " (Student)"));
+            return "SUCCESS Login successful. Role: " +
+                   std::string(isAdmin ? "Admin" : "Student") + "\r\n";
+        }
 
+        case CommandType::Register: {
+            if (request.fields.size() < 2)
+                return "FAILURE Usage: REGISTER <username> <password>\r\n";
+            if (request.fields[0].length() < 3)
+                return "FAILURE Username must be at least 3 characters\r\n";
+            if (request.fields[1].length() < 4)
+                return "FAILURE Password must be at least 4 characters\r\n";
+
+            Auth::LoginResult result = auth.registerUser(request.fields[0], request.fields[1]);
+            if (!result.success)
+                return "FAILURE Username already exists\r\n";
+
+            // Auto-login after successful registration
+            loggedIn = true;
+            isAdmin = (result.role == UserRole::Admin);
+            username = request.fields[0];
+            logger.info(clientAddress + " registered and logged in: " + username +
+                        (isAdmin ? " (Admin)" : " (Student)"));
+            return "SUCCESS Registration successful. Role: " +
+                   std::string(isAdmin ? "Admin" : "Student") + "\r\n";
+        }
+
+        // ---- Admin operations ----
         case CommandType::Add: {
-            if (!adminLoggedIn) {
+            if (!loggedIn || !isAdmin) {
                 return "ERROR Permission denied\r\n";
             }
 
@@ -164,7 +206,7 @@ std::string ClientHandler::handleCommand(const std::string& line, bool& shouldCl
         }
 
         case CommandType::Update:
-            if (!adminLoggedIn) {
+            if (!loggedIn || !isAdmin) {
                 return "ERROR Permission denied\r\n";
             }
 
@@ -179,7 +221,7 @@ std::string ClientHandler::handleCommand(const std::string& line, bool& shouldCl
             return "ERROR Record not found or invalid field\r\n";
 
         case CommandType::DeleteCourse:
-            if (!adminLoggedIn) {
+            if (!loggedIn || !isAdmin) {
                 return "ERROR Permission denied\r\n";
             }
 
@@ -190,6 +232,7 @@ std::string ClientHandler::handleCommand(const std::string& line, bool& shouldCl
 
             return "ERROR Record not found\r\n";
 
+        // ---- Encryption demo ----
         case CommandType::Encrypt: {
             const std::string& data = request.fields[0];
             const std::string& key = request.fields[1];

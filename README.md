@@ -40,7 +40,6 @@ g++ -std=c++11 -Wall -Wextra server/server.cpp -o timetable_server.exe -lws2_32
 g++ -std=c++11 -Wall -Wextra client/client.cpp client/network_client.cpp -o timetable_client.exe -lws2_32
 
 # 编译 GUI 客户端
-g++ -std=c++11 -Wall client/gui_client.cpp client/network_client.cpp -o timetable_gui.exe -lws2_32 -lgdi32 -lcomctl32 -mwindows
 ```
 
 如果系统已安装make工具，也可以使用 Makefile：

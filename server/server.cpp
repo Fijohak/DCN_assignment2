@@ -61,7 +61,9 @@ bool Server::start() {
         }
 
         const std::string address = clientAddressToString(clientAddr);
-        std::thread(ClientHandler(clientSocket, database, logger, address)).detach();
+        std::thread([this, clientSocket, address]() {
+            ClientHandler(clientSocket, database, logger, address)();
+        }).detach();
     }
 
     return true;

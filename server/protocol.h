@@ -16,6 +16,7 @@ enum class CommandType {
     QueryInstructor,
     QuerySemester,
     Login,
+    Register,
     Add,
     Update,
     DeleteCourse,

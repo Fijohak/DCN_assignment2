@@ -1,3 +1,6 @@
+// NetworkClient - TCP client with encryption support.
+// Handles connection, send/receive, and response parsing.
+
 #include "../include/network_client.h"
 #include <iostream>
 #include <ws2tcpip.h>
@@ -32,7 +35,7 @@ bool NetworkClient::connect(const std::string& ip, int port) {
         return false;
     }
 
-    // Read server welcome message
+    // Read the server's welcome message
     char welcomeBuf[256] = {0};
     int len = recv(m_sock, welcomeBuf, sizeof(welcomeBuf) - 1, 0);
     if (len <= 0) {
@@ -42,24 +45,6 @@ bool NetworkClient::connect(const std::string& ip, int port) {
         return false;
     }
     m_welcome = std::string(welcomeBuf, len);
-
-    // Negotiate encryption
-    std::string encReq = std::string("ENCRYPT 1") + MSG_TERMINATOR;
-    if (send(m_sock, encReq.c_str(), static_cast<int>(encReq.length()), 0) == SOCKET_ERROR) {
-        std::cerr << "Encryption request failed: " << WSAGetLastError() << std::endl;
-        closesocket(m_sock);
-        m_sock = INVALID_SOCKET;
-        return false;
-    }
-
-    char encBuf[64] = {0};
-    int encLen = recv(m_sock, encBuf, sizeof(encBuf) - 1, 0);
-    if (encLen > 0) {
-        std::string response(encBuf, encLen);
-        if (response.find("ENCRYPT_OK") == 0) {
-            m_encrypted = true;
-        }
-    }
 
     m_connected = true;
     return true;
@@ -89,12 +74,7 @@ std::string NetworkClient::sendRequest(const std::string& request) {
         return std::string(ERROR_PREFIX) + "Not connected" + MSG_TERMINATOR;
     }
 
-    if (!isConnected()) {
-        m_connected = false;
-        return std::string(ERROR_PREFIX) + "Connection lost" + MSG_TERMINATOR;
-    }
-
-    // Build wire format
+    // Build wire format: append newline terminator
     std::string data;
     if (m_encrypted) {
         std::string clean = request;
@@ -135,13 +115,14 @@ std::string NetworkClient::receiveResponse() {
         chunk[bytes] = '\0';
         buffer.append(chunk, bytes);
 
+        // Safety limit: reject excessively large responses
         if (buffer.size() > 65536) {
             m_connected = false;
             return std::string(ERROR_PREFIX) + "Response too large" + MSG_TERMINATOR;
         }
 
         if (m_encrypted) {
-            // Encrypted responses: single hex line terminated by '\n'
+            // Encrypted response: single hex-encoded line terminated by '\n'
             size_t nl = buffer.find('\n');
             if (nl != std::string::npos) {
                 std::string decrypted = decryptMessage(buffer.substr(0, nl));
@@ -151,14 +132,14 @@ std::string NetworkClient::receiveResponse() {
                 return decrypted;
             }
         } else {
-            // Plaintext query response: RESULT\n...\nEND\n
+            // Multi-line query response: starts with "RESULT", ends with "\nEND"
             if (buffer.find(RESULT_START) == 0) {
                 size_t end = buffer.find(RESULT_END);
                 if (end != std::string::npos) {
                     return buffer;
                 }
             } else {
-                // Plaintext non-query: single line terminated by '\n'
+                // Single-line response: terminated by '\n'
                 size_t nl = buffer.find('\n');
                 if (nl != std::string::npos) {
                     return buffer.substr(0, nl + 1);
