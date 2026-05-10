@@ -5,7 +5,8 @@
       "Bash(g++ -std=c++11 -Wall -Wextra client/client.cpp client/network_client.cpp -o timetable_client.exe -lws2_32)",
       "Bash(g++ -std=c++11 -Wall client/gui_client.cpp client/network_client.cpp -o timetable_gui.exe -lws2_32 -lgdi32 -lcomctl32 -mwindows)",
       "Bash(g++ -std=c++11 -Wall -Wextra client/gui_client.cpp client/network_client.cpp -o timetable_gui.exe -lws2_32 -lgdi32 -lcomctl32 -mwindows)",
-      "Bash(g++ -std=c++11 -Wall server/main.cpp server/server.cpp server/client_handler.cpp server/auth.cpp server/logger.cpp server/protocol.cpp database/course_db.cpp -o timetable_server.exe -lws2_32)"
+      "Bash(g++ -std=c++11 -Wall server/main.cpp server/server.cpp server/client_handler.cpp server/auth.cpp server/logger.cpp server/protocol.cpp database/course_db.cpp -o timetable_server.exe -lws2_32)",
+      "Bash(git *)"
     ]
   }
 }
