@@ -37,8 +37,7 @@ int main() {
     std::cout << "Press Ctrl+C to stop the server." << std::endl;
     logger.info("Server starting");
 
-    const unsigned short httpPort = 8080;
-    Server server(port, httpPort, database, logger);
+    Server server(port, database, logger);
     const bool ok = server.start();
 
 #ifdef _WIN32

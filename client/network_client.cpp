@@ -1,7 +1,6 @@
 // NetworkClient - TCP client with encryption support.
 // Handles connection, send/receive, and response parsing.
 
-#define _WIN32_WINNT 0x0600
 #include "../include/network_client.h"
 #include <iostream>
 #include <ws2tcpip.h>
@@ -21,7 +20,7 @@ bool NetworkClient::connect(const std::string& ip, int port) {
     sockaddr_in addr;
     addr.sin_family = AF_INET;
     addr.sin_port = htons(port);
-    inet_pton(AF_INET, ip.c_str(), &addr.sin_addr);
+    addr.sin_addr.s_addr = inet_addr(ip.c_str());
 
     m_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (m_sock == INVALID_SOCKET) {
