@@ -1,3 +1,4 @@
+#define _WIN32_WINNT 0x0600
 #include "server.h"
 
 #include "client_handler.h"

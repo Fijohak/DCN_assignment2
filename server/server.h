@@ -25,6 +25,12 @@ private:
 
     bool createListenSocket();
     static std::string clientAddressToString(sockaddr_in clientAddr);
+
+    // HTTP server
+    void httpServerThread();
+    std::string handleHttpRequest(const std::string& method, const std::string& path, const std::string& query);
+    std::string urlDecode(const std::string& input);
+    std::string serveStaticFile(const std::string& path);
 };
 
 #endif  // SERVER_SERVER_H
