@@ -3,6 +3,7 @@
 #include <ctime>
 #include <fstream>
 #include <iomanip>
+#include <iostream>
 #include <sstream>
 
 Logger::Logger(const std::string& filename) : filename(filename) {}
@@ -17,14 +18,19 @@ void Logger::error(const std::string& message) {
 
 void Logger::write(const std::string& level, const std::string& message) {
     std::lock_guard<std::mutex> lock(logMutex);
+    
+    // Write to file
     std::ofstream out(filename.c_str(), std::ios::out | std::ios::app);
-    if (!out.is_open()) {
-        return;
+    if (out.is_open()) {
+        out << "[" << timestamp() << "] "
+            << "[" << level << "] "
+            << message << '\n';
     }
 
-    out << "[" << timestamp() << "] "
-        << "[" << level << "] "
-        << message << '\n';
+    // Also print to console (stdout) for real-time display
+    std::cout << "[" << timestamp() << "] "
+              << "[" << level << "] "
+              << message << std::endl;
 }
 
 std::string Logger::timestamp() {

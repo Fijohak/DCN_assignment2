@@ -135,9 +135,13 @@ tr:hover td { background: #1c2128; }
 <div class="container">
     <div class="header">
         <h1>Course Timetable Inquiry System</h1>
-        <div class="connection-status">
-            <span class="status-dot connected" id="statusDot"></span>
-            <span id="statusText">Connected</span>
+        <div style="display:flex;align-items:center;gap:10px;">
+            <button id="reconnectBtn" onclick="doReconnect()" class="primary" style="font-size:12px;padding:5px 10px;display:none;">Reconnect</button>
+            <button id="exitBtnHeader" onclick="doExit()" class="danger" style="font-size:12px;padding:5px 10px;">Exit</button>
+            <div class="connection-status">
+                <span class="status-dot connected" id="statusDot"></span>
+                <span id="statusText">Connected</span>
+            </div>
         </div>
     </div>
     <div class="quick-actions">
@@ -171,6 +175,7 @@ tr:hover td { background: #1c2128; }
                 <span><span id="displayUser"></span></span>
                 <span class="role-badge" id="displayRole"></span>
                 <button id="logoutBtn" onclick="doLogout()" style="margin-left:auto;">Logout</button>
+                <button id="exitBtn" onclick="doExit()" class="danger" style="display:none;">Exit</button>
             </div>
         </div>
     </div>
@@ -534,6 +539,7 @@ function updateUI() {
     const loginPanel = document.getElementById('loginPanel');
     const quickAdmin = document.getElementById('quickAdmin');
     const logoutBtn = document.getElementById('logoutBtn');
+    const exitBtn = document.getElementById('exitBtn');
     if (currentUser) {
         loginPanel.classList.add('hidden');
         userInfo.classList.remove('hidden');
@@ -541,6 +547,7 @@ function updateUI() {
         document.getElementById('displayRole').textContent = currentRole;
         document.getElementById('displayRole').className = 'role-badge ' + (currentRole === 'Admin' ? 'admin' : 'student');
         logoutBtn.classList.remove('hidden');
+        exitBtn.style.display = '';
         adminPanel.classList.remove('hidden');
         quickAdmin.classList.remove('hidden');
         const isAdmin = currentRole === 'Admin';
@@ -561,6 +568,7 @@ function updateUI() {
         loginPanel.classList.remove('hidden');
         userInfo.classList.add('hidden');
         logoutBtn.classList.add('hidden');
+        exitBtn.style.display = 'none';
         adminPanel.classList.add('hidden');
         quickAdmin.classList.add('hidden');
     }
@@ -599,11 +607,60 @@ function doRegister() {
 }
 
 function doLogout() {
+    api('logout').then(function(r) {
+        addLog('Server response: ' + r, 'info');
+    }).catch(function(err) {
+        addLog('Logout API error: ' + err, 'error');
+    });
     currentUser = null; currentRole = '';
     updateUI();
     showSuccess('Logged out');
     document.getElementById('courseTable').innerHTML = '';
     document.getElementById('searchSummary').textContent = '';
+}
+
+function doExit() {
+    if (!confirm('Exit the system? This will close the connection.')) return;
+    api('exit').then(function(r) {
+        addLog('Server response: ' + r, 'info');
+        showSuccess('Exiting system...');
+        // Clear all state
+        currentUser = null; currentRole = '';
+        updateUI();
+        document.getElementById('courseTable').innerHTML = '';
+        document.getElementById('searchSummary').textContent = '';
+        // Show disconnected status
+        document.getElementById('statusDot').className = 'status-dot disconnected';
+        document.getElementById('statusText').textContent = 'Disconnected';
+        document.getElementById('reconnectBtn').style.display = '';
+        document.getElementById('exitBtnHeader').style.display = 'none';
+        addLog('System exited. Click Reconnect to reconnect.', 'info');
+    }).catch(function(err) {
+        addLog('Exit API error: ' + err, 'error');
+    });
+}
+
+function doReconnect() {
+    addLog('Reconnecting...', 'info');
+    // Reset connection status
+    document.getElementById('statusDot').className = 'status-dot connected';
+    document.getElementById('statusText').textContent = 'Connected';
+    document.getElementById('reconnectBtn').style.display = 'none';
+    document.getElementById('exitBtnHeader').style.display = '';
+    // Ping server to verify connection
+    api('ping').then(function(r) {
+        addLog('Reconnected: ' + r, 'success');
+        showSuccess('Reconnected successfully');
+        // Restore login panel
+        document.getElementById('loginPanel').classList.remove('hidden');
+    }).catch(function(err) {
+        addLog('Reconnect failed: ' + err, 'error');
+        showError('Reconnect failed. Is the server running?');
+        document.getElementById('statusDot').className = 'status-dot disconnected';
+        document.getElementById('statusText').textContent = 'Disconnected';
+        document.getElementById('reconnectBtn').style.display = '';
+        document.getElementById('exitBtnHeader').style.display = 'none';
+    });
 }
 
 function loadCourses() {
@@ -627,7 +684,9 @@ function displayCourses(response) {
         table.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#f85149;">No results or error</td></tr>';
         summary.textContent = '0 courses found'; return;
     }
-    const lines = response.split('\n');
+    // Normalize line endings: replace \r\n with \n, then split
+    const normalized = response.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    const lines = normalized.split('\n');
     let courses = [];
     let inResult = false;
     for (let i = 0; i < lines.length; i++) {
@@ -673,6 +732,7 @@ function doAddCourse() {
     if (!semester || !code || !title || !section || !instructor || !day || !start || !end || !room) {
         showError('Please fill in all fields'); return;
     }
+    // Use pipe-separated format for ADD (protocol.cpp supports both pipe and space)
     const params = semester + '|' + code + '|' + title + '|' + section + '|' + instructor + '|' + day + '|' + start + '|' + end + '|' + room;
     api('add', params).then(r => {
         if (r.startsWith('OK')) {
@@ -688,6 +748,7 @@ function doUpdateCourse() {
     const field = document.getElementById('updateField').value;
     const value = document.getElementById('updateValue').value.trim();
     if (!code || !section || !value) { showError('Please fill in all fields'); return; }
+    // Use pipe-separated format for UPDATE (protocol.cpp supports both pipe and space)
     const params = code + '|' + section + '|' + field + '|' + value;
     api('update', params).then(r => {
         if (r.startsWith('OK')) {
@@ -702,6 +763,7 @@ function doDeleteCourse() {
     const section = document.getElementById('deleteSection').value.trim();
     if (!code || !section) { showError('Please fill in all fields'); return; }
     if (!confirm('Delete ' + code + ' section ' + section + '?')) return;
+    // Use pipe-separated format for DELETE (protocol.cpp supports both pipe and space)
     const params = code + '|' + section;
     api('delete', params).then(r => {
         if (r.startsWith('OK')) {
@@ -879,9 +941,9 @@ function addConcurrencyResult(msg, type) {
     container.scrollTop = container.scrollHeight;
 }
 
-// Auto-refresh on load
-setTimeout(refreshConcurrency, 1000);
-setInterval(refreshConcurrency, 5000);
+// Auto-refresh on load (longer interval to reduce server log noise)
+setTimeout(refreshConcurrency, 2000);
+setInterval(refreshConcurrency, 30000);
 </script>
 </body>
 </html>

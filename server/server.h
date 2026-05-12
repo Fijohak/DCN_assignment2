@@ -12,16 +12,27 @@
 typedef int SOCKET;
 #endif
 
+#include <atomic>
+
 class Server {
 public:
     Server(unsigned short port, CourseDB& database, Logger& logger);
     bool start();
+
+    // Connection tracking
+    void incrementConnections();
+    void decrementConnections();
+    int getActiveConnections() const;
+    int getTotalConnections() const;
 
 private:
     unsigned short port;
     CourseDB& database;
     Logger& logger;
     SOCKET listenSocket;
+
+    std::atomic<int> activeConnections{0};
+    std::atomic<int> totalConnections{0};
 
     bool createListenSocket();
     static std::string clientAddressToString(sockaddr_in clientAddr);

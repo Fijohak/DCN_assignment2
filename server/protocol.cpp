@@ -28,6 +28,10 @@ Request Protocol::parseRequest(const std::string& line) {
         request.type = CommandType::Help;
     } else if (command == "QUIT") {
         request.type = CommandType::Quit;
+    } else if (command == "LOGOUT") {
+        request.type = CommandType::Logout;
+    } else if (command == "EXIT") {
+        request.type = CommandType::Exit;
     } else if (command == "LIST_ALL") {
         request.type = CommandType::ListAll;
     } else if (command == "QUERY_CODE") {
@@ -62,17 +66,65 @@ Request Protocol::parseRequest(const std::string& line) {
             request.type = CommandType::Invalid;
         }
     } else if (command == "ADD") {
+        // Support both pipe-separated and space-separated formats
         request.fields = splitPipe(rest);
+        if (request.fields.size() != 9) {
+            // Try space-separated: ADD <semester> <code> <title> <section> <instructor> <day> <start> <end> <room>
+            request.fields.clear();
+            std::istringstream iss(rest);
+            std::string token;
+            while (iss >> token) {
+                request.fields.push_back(token);
+            }
+        }
         request.type = request.fields.size() == 9 ? CommandType::Add : CommandType::Invalid;
     } else if (command == "UPDATE") {
+        // Support both pipe-separated and space-separated formats
         request.fields = splitPipe(rest);
+        if (request.fields.size() != 4) {
+            // Try space-separated: UPDATE <code> <section> <field> <newvalue>
+            request.fields.clear();
+            std::istringstream iss(rest);
+            std::string token;
+            while (iss >> token) {
+                request.fields.push_back(token);
+            }
+        }
         request.type = request.fields.size() == 4 ? CommandType::Update : CommandType::Invalid;
     } else if (command == "DELETE") {
+        // Support both pipe-separated and space-separated formats
         request.fields = splitPipe(rest);
+        if (request.fields.size() != 2) {
+            // Try space-separated: DELETE <code> <section>
+            request.fields.clear();
+            std::istringstream iss(rest);
+            std::string token;
+            while (iss >> token) {
+                request.fields.push_back(token);
+            }
+        }
         request.type = request.fields.size() == 2 ? CommandType::DeleteCourse : CommandType::Invalid;
     } else if (command == "ENCRYPT") {
         request.fields = splitPipe(rest);
         request.type = request.fields.size() == 2 ? CommandType::Encrypt : CommandType::Invalid;
+        request.argument = rest;
+    } else if (command == "STATUS") {
+        request.type = CommandType::Status;
+    } else if (command == "CONNECTIONS") {
+        request.type = CommandType::Connections;
+    } else if (command == "DEMO_CONCURRENCY") {
+        request.type = CommandType::DemoConcurrency;
+        request.argument = rest;
+    } else if (command == "CLOSE_DEMO") {
+        request.type = CommandType::CloseDemo;
+    } else if (command == "QUERY_ON_CONNECTIONS") {
+        request.type = CommandType::QueryOnConnections;
+        request.argument = rest;
+    } else if (command == "STRESS_TEST") {
+        request.type = CommandType::StressTest;
+        request.argument = rest;
+    } else if (command == "SEQUENTIAL_TEST") {
+        request.type = CommandType::SequentialTest;
         request.argument = rest;
     } else {
         request.type = CommandType::Invalid;
@@ -95,11 +147,11 @@ std::string Protocol::formatCourses(const std::vector<Course>& courses) {
 
 std::string Protocol::formatCourse(const Course& course) {
     std::ostringstream oss;
-    oss << course.courseCode << '|'
+    oss << course.semester << '|'
+        << course.courseCode << '|'
         << course.courseTitle << '|'
         << course.section << '|'
         << course.instructor << '|'
-        << course.semester << '|'
         << course.day << '|'
         << course.startTime << '|'
         << course.endTime << '|'
@@ -108,12 +160,23 @@ std::string Protocol::formatCourse(const Course& course) {
 }
 
 std::string Protocol::helpText() {
-    return "OK Commands: PING, HELP, LIST_ALL, QUERY_CODE <course_code>, "
-           "QUERY_INSTRUCTOR <instructor>, QUERY_SEMESTER <semester>, "
-           "LOGIN <username> <password>, REGISTER <username> <password>, "
-           "ADD <9 pipe fields>, "
-           "UPDATE <code>|<section>|<field>|<new_value>, DELETE <code>|<section>, "
-           "ENCRYPT <data>|<key>, QUIT\r\n";
+    return "OK Commands:\r\n"
+           "  PING                          - Test connection\r\n"
+           "  HELP                          - Show this help\r\n"
+           "  QUIT                          - Disconnect\r\n"
+           "  LOGIN <user> <pass>           - Authenticate\r\n"
+           "  REGISTER <user> <pass>        - Register new user\r\n"
+           "  LIST_ALL                      - View all courses\r\n"
+           "  QUERY_CODE <code>             - Search by course code\r\n"
+           "  QUERY_INSTRUCTOR <name>       - Search by instructor\r\n"
+           "  QUERY_SEMESTER <semester>     - Search by semester\r\n"
+           "  ADD <semester>|<code>|<title>|<sec>|<inst>|<day>|<start>|<end>|<room>\r\n"
+           "  UPDATE <code>|<sec>|<field>|<newvalue>\r\n"
+           "  DELETE <code>|<sec>\r\n"
+           "  ENCRYPT <data>|<key>          - XOR encryption demo\r\n"
+           "  STATUS                        - Server status\r\n"
+           "  CONNECTIONS                   - Active connections\r\n"
+           "  (ADD/UPDATE/DELETE also support space-separated format)\r\n";
 }
 
 std::string Protocol::trim(const std::string& value) {

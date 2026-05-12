@@ -21,6 +21,15 @@ enum class CommandType {
     Update,
     DeleteCourse,
     Encrypt,
+    Status,
+    Connections,
+    Logout,
+    Exit,
+    DemoConcurrency,
+    CloseDemo,
+    QueryOnConnections,
+    StressTest,
+    SequentialTest,
     Invalid
 };
 

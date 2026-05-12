@@ -26,25 +26,44 @@ static std::string bytesToHex(const std::string& data) {
 ClientHandler::ClientHandler(SOCKET clientSocket,
                              CourseDB& database,
                              Logger& logger,
-                             const std::string& clientAddress)
+                             const std::string& clientAddress,
+                             std::function<void()> onDisconnect)
     : clientSocket(clientSocket),
       database(database),
       logger(logger),
       clientAddress(clientAddress),
       loggedIn(false),
-      isAdmin(false) {}
+      isAdmin(false),
+      onDisconnect(onDisconnect) {}
 
 void ClientHandler::operator()() {
-    logger.info("Client connected: " + clientAddress);
+    logger.info("Client connected: " + clientAddress + " [Active connections: +1]");
     sendResponse("OK Connected to Course Timetable Server. Use ENCRYPT <text>|<key> to test encryption.\r\n");
 
     bool shouldClose = false;
     std::string line;
+    int cmdCount = 0;
 
     while (!shouldClose && receiveLine(line)) {
+        cmdCount++;
+        logger.info(clientAddress + " >> " + line);
         const std::string response = handleCommand(line, shouldClose);
-        if (!response.empty() && !sendResponse(response)) {
-            break;
+        if (!response.empty()) {
+            // Log the response summary (first line only for brevity)
+            std::string respSummary = response;
+            size_t newlinePos = respSummary.find('\n');
+            if (newlinePos != std::string::npos) {
+                respSummary = respSummary.substr(0, newlinePos);
+            }
+            size_t crPos = respSummary.find('\r');
+            if (crPos != std::string::npos) {
+                respSummary = respSummary.substr(0, crPos);
+            }
+            logger.info(clientAddress + " << " + respSummary);
+            
+            if (!sendResponse(response)) {
+                break;
+            }
         }
     }
 
@@ -54,7 +73,11 @@ void ClientHandler::operator()() {
     close(clientSocket);
 #endif
 
-    logger.info("Client disconnected: " + clientAddress);
+    if (onDisconnect) {
+        onDisconnect();
+    }
+
+    logger.info("Client disconnected: " + clientAddress + " [processed " + std::to_string(cmdCount) + " commands]");
 }
 
 bool ClientHandler::receiveLine(std::string& line) {
@@ -115,6 +138,19 @@ std::string ClientHandler::handleCommand(const std::string& line, bool& shouldCl
 
         case CommandType::Quit:
             shouldClose = true;
+            return "OK Goodbye\r\n";
+
+        case CommandType::Logout:
+            if (!loggedIn) return "ERROR Not logged in\r\n";
+            loggedIn = false;
+            isAdmin = false;
+            logger.info(clientAddress + " LOGOUT: " + username + " logged out");
+            username.clear();
+            return "OK Logged out successfully\r\n";
+
+        case CommandType::Exit:
+            shouldClose = true;
+            logger.info(clientAddress + " EXIT: connection closing");
             return "OK Goodbye\r\n";
 
         // ---- Queries (require login) ----

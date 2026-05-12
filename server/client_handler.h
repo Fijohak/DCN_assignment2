@@ -12,6 +12,7 @@
 typedef int SOCKET;
 #endif
 
+#include <functional>
 #include <string>
 
 class ClientHandler {
@@ -19,7 +20,8 @@ public:
     ClientHandler(SOCKET clientSocket,
                   CourseDB& database,
                   Logger& logger,
-                  const std::string& clientAddress);
+                  const std::string& clientAddress,
+                  std::function<void()> onDisconnect = nullptr);
 
     void operator()();
 
@@ -32,6 +34,7 @@ private:
     bool isAdmin;
     std::string username;
     Auth auth{"database/users.csv"};
+    std::function<void()> onDisconnect;
 
     bool receiveLine(std::string& line);
     bool sendResponse(const std::string& response);
