@@ -1,76 +1,41 @@
 @echo off
 title Course Timetable System
-cd /d d:\Share\资料\y2s2\Net\As_2
+color 0B
 
-echo ========================================
-echo   Course Timetable System - Quick Start
-echo ========================================
+:: Get the directory where this batch file is located
+set "SCRIPT_DIR=%~dp0"
+cd /d "%SCRIPT_DIR%"
+
+echo ============================================
+echo   Course Timetable Inquiry System
+echo ============================================
 echo.
-echo Choose client type:
-echo   1. CMD Client (console)
-echo   2. GUI Client (graphical)
-echo.
-set /p choice="Enter choice (1 or 2): "
-
-:: 检查可执行文件是否存在
-if not exist timetable_server.exe (
-    echo [ERROR] timetable_server.exe not found!
-    echo Please compile first: g++ -std=c++11 -Wall -Wextra server/server.cpp -o timetable_server.exe -lws2_32
-    pause
-    exit /b 1
-)
-
-if "%choice%"=="1" (
-    if not exist timetable_client.exe (
-        echo [ERROR] timetable_client.exe not found!
-        echo Please compile first: g++ -std=c++11 -Wall -Wextra client/client.cpp -o timetable_client.exe -lws2_32
-        pause
-        exit /b 1
-    )
-) else if "%choice%"=="2" (
-    if not exist timetable_gui.exe (
-        echo [ERROR] timetable_gui.exe not found!
-        echo Please compile first: g++ -std=c++11 -Wall client/gui_client.cpp -o timetable_gui.exe -lws2_32 -lgdi32 -lcomctl32 -mwindows
-        pause
-        exit /b 1
-    )
-) else (
-    echo Invalid choice!
-    pause
-    exit /b 1
-)
-
-:: 启动服务器（新窗口）
 echo [1/2] Starting server on port 54000...
-start "Timetable Server" /MIN timetable_server.exe
+echo       Web interface: http://localhost:8080
+echo.
 
-:: 等待服务器启动
+:: Start the server in the background (using full path for portability)
+start /B /MIN "%SCRIPT_DIR%timetable_server.exe"
+
+:: Wait for server to initialize
 timeout /t 2 /nobreak >nul
 
-:: 启动客户端
-if "%choice%"=="1" (
-    echo [2/2] Starting CMD client...
-    echo.
-    echo Tip: Default accounts -
-    echo   Student: student / student123
-    echo   Admin:   admin   / admin123
-    echo.
-    echo You can also register a new account!
-    echo.
-    start "Timetable Client" timetable_client.exe
-) else (
-    echo [2/2] Starting GUI client...
-    start "Timetable GUI" timetable_gui.exe
-)
-
+echo [2/2] Opening web interface...
 echo.
-echo Both server and client are running!
-echo Close this window when done.
-echo.
-pause
+start http://localhost:8080
 
-:: 关闭服务器（当用户按任意键后）
-echo Shutting down server...
+echo ============================================
+echo   Server is running!
+echo   - TCP Port: 54000 (CMD Client)
+echo   - Web UI:   http://localhost:8080
+echo   - Default Admin: admin / admin123
+echo ============================================
+echo.
+echo Press any key to stop the server...
+pause >nul
+
+:: Kill the server
 taskkill /f /im timetable_server.exe >nul 2>&1
-echo Server stopped. Goodbye!
+
+echo Server stopped.
 timeout /t 2 /nobreak >nul

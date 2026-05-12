@@ -1,6 +1,7 @@
 // NetworkClient - TCP client with encryption support.
 // Handles connection, send/receive, and response parsing.
 
+#define _WIN32_WINNT 0x0600
 #include "../include/network_client.h"
 #include <iostream>
 #include <ws2tcpip.h>

@@ -2,6 +2,7 @@
 // Handles authentication, course queries, and admin CRUD operations.
 
 #include "client_handler.h"
+#include "server.h"
 
 #ifdef _WIN32
 #include <winsock2.h>
@@ -26,11 +27,13 @@ static std::string bytesToHex(const std::string& data) {
 ClientHandler::ClientHandler(SOCKET clientSocket,
                              CourseDB& database,
                              Logger& logger,
-                             const std::string& clientAddress)
+                             const std::string& clientAddress,
+                             Server* server)
     : clientSocket(clientSocket),
       database(database),
       logger(logger),
       clientAddress(clientAddress),
+      server(server),
       loggedIn(false),
       isAdmin(false) {}
 
@@ -152,6 +155,10 @@ std::string ClientHandler::handleCommand(const std::string& line, bool& shouldCl
             loggedIn = true;
             isAdmin = (result.role == UserRole::Admin);
             username = request.fields[0];
+            if (server) {
+                server->onClientLoggedIn(clientAddress, username,
+                    isAdmin ? "Admin" : "Student");
+            }
             logger.info(clientAddress + " login: " + username +
                         (isAdmin ? " (Admin)" : " (Student)"));
             return "SUCCESS Login successful. Role: " +
@@ -174,6 +181,10 @@ std::string ClientHandler::handleCommand(const std::string& line, bool& shouldCl
             loggedIn = true;
             isAdmin = (result.role == UserRole::Admin);
             username = request.fields[0];
+            if (server) {
+                server->onClientLoggedIn(clientAddress, username,
+                    isAdmin ? "Admin" : "Student");
+            }
             logger.info(clientAddress + " registered and logged in: " + username +
                         (isAdmin ? " (Admin)" : " (Student)"));
             return "SUCCESS Registration successful. Role: " +

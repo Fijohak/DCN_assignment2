@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Course Timetable System</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #0d1117; color: #c9d1d9; padding: 20px; min-height: 100vh;
+}
+.container { max-width: 1200px; margin: 0 auto; }
+.header {
+    background: linear-gradient(135deg, #161b22, #1c2333);
+    border: 1px solid #30363d; border-radius: 12px;
+    padding: 20px 28px; margin-bottom: 20px;
+    display: flex; justify-content: space-between; align-items: center;
+}
+.header h1 { font-size: 22px; color: #58a6ff; display: flex; align-items: center; gap: 10px; }
+.connection-status { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.status-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.status-dot.connected { background: #3fb950; box-shadow: 0 0 8px rgba(63,185,80,0.4); }
+.status-dot.disconnected { background: #f85149; box-shadow: 0 0 8px rgba(248,81,73,0.4); }
+.quick-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+.quick-actions button { font-size: 12px; padding: 6px 12px; }
+.panel {
+    background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+    margin-bottom: 12px; overflow: hidden;
+}
+.panel-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 16px; cursor: pointer; user-select: none; transition: background 0.2s;
+}
+.panel-header:hover { background: #1c2128; }
+.panel-header h2 { font-size: 14px; color: #58a6ff; display: flex; align-items: center; gap: 8px; }
+.panel-header .toggle-icon { color: #484f58; font-size: 12px; transition: transform 0.2s; }
+.panel-header.collapsed .toggle-icon { transform: rotate(-90deg); }
+.panel-body { padding: 12px 16px 16px; border-top: 1px solid #21262d; }
+.panel-body.hidden { display: none; }
+.form-row { display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; align-items: flex-end; }
+.form-group { display: flex; flex-direction: column; gap: 3px; }
+.form-group label { font-size: 11px; color: #8b949e; font-weight: 500; }
+input, select, button { font-family: inherit; font-size: 13px; }
+input, select {
+    background: #0d1117; border: 1px solid #30363d; border-radius: 6px;
+    padding: 7px 10px; color: #c9d1d9; outline: none; transition: border-color 0.2s;
+}
+input:focus, select:focus { border-color: #58a6ff; }
+input::placeholder { color: #484f58; }
+button {
+    background: #21262d; border: 1px solid #30363d; border-radius: 6px;
+    padding: 7px 14px; color: #c9d1d9; cursor: pointer; transition: all 0.2s; white-space: nowrap;
+}
+button:hover { background: #30363d; border-color: #8b949e; }
+button.primary { background: #238636; border-color: #2ea043; color: #fff; }
+button.primary:hover { background: #2ea043; }
+button.danger { background: #da3633; border-color: #f85149; color: #fff; }
+button.danger:hover { background: #f85149; }
+button.warning { background: #d29922; border-color: #e3b341; color: #fff; }
+button.warning:hover { background: #e3b341; }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+button.small { font-size: 11px; padding: 4px 8px; }
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
+th {
+    background: #21262d; color: #8b949e; font-weight: 600; text-align: left;
+    padding: 8px 10px; border-bottom: 1px solid #30363d; position: sticky; top: 0;
+}
+td { padding: 6px 10px; border-bottom: 1px solid #21262d; }
+tr:hover td { background: #1c2128; }
+.table-container { max-height: 350px; overflow-y: auto; border: 1px solid #30363d; border-radius: 6px; }
+.protocol-console, .encryption-steps {
+    background: #0d1117; border: 1px solid #30363d; border-radius: 6px;
+    padding: 12px; margin-top: 10px; font-family: 'Courier New', monospace;
+    font-size: 12px; line-height: 1.7; max-height: 200px; overflow-y: auto;
+}
+.protocol-console .line-req { color: #58a6ff; }
+.protocol-console .line-res { color: #3fb950; }
+.protocol-console .line-err { color: #f85149; }
+.encryption-steps .step { padding: 3px 0; }
+.encryption-steps .step-label { color: #8b949e; margin-right: 6px; }
+.encryption-steps .step-value { color: #7ee787; }
+.log-container {
+    background: #0d1117; border: 1px solid #30363d; border-radius: 6px;
+    padding: 10px; max-height: 150px; overflow-y: auto;
+    font-family: 'Courier New', monospace; font-size: 11px; line-height: 1.5;
+}
+.log-entry { padding: 1px 0; color: #8b949e; }
+.log-entry .log-time { color: #484f58; }
+.log-entry .log-info { color: #58a6ff; }
+.log-entry .log-error { color: #f85149; }
+.log-entry .log-success { color: #3fb950; }
+.user-info {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 12px; background: #0d1117;
+    border: 1px solid #30363d; border-radius: 6px; margin-bottom: 10px;
+}
+.user-info .role-badge { padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 600; }
+.role-badge.admin { background: #d29922; color: #0d1117; }
+.role-badge.student { background: #238636; color: #fff; }
+.hidden { display: none !important; }
+.status-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px;
+}
+.status-item {
+    background: #0d1117; border: 1px solid #30363d; border-radius: 6px;
+    padding: 10px; text-align: center;
+}
+.status-item .label { font-size: 10px; color: #8b949e; margin-bottom: 3px; }
+.status-item .value { font-size: 13px; color: #c9d1d9; font-weight: 600; }
+.status-item .value.highlight { color: #d29922; font-size: 20px; }
+.connection-table { width: 100%; font-size: 11px; }
+.connection-table th { font-size: 10px; padding: 5px 6px; }
+.connection-table td { padding: 3px 6px; }
+.connection-badge {
+    display: inline-block; padding: 1px 6px; border-radius: 8px;
+    font-size: 10px; font-weight: 600;
+}
+.connection-badge.active { background: #238636; color: #fff; }
+.connection-badge.anonymous { background: #484f58; color: #c9d1d9; }
+.search-summary { color: #8b949e; font-size: 12px; margin-bottom: 6px; }
+.sub-section { margin-bottom: 12px; }
+.sub-section:last-child { margin-bottom: 0; }
+.sub-section h3 {
+    font-size: 13px; color: #8b949e; margin-bottom: 8px;
+    display: flex; align-items: center; gap: 6px;
+}
+@media (max-width: 768px) {
+    .form-row { flex-direction: column; }
+    .header { flex-direction: column; gap: 10px; text-align: center; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>Course Timetable Inquiry System</h1>
+        <div class="connection-status">
+            <span class="status-dot connected" id="statusDot"></span>
+            <span id="statusText">Connected</span>
+        </div>
+    </div>
+    <div class="quick-actions">
+        <button class="primary" onclick="document.getElementById('loginPanel').scrollIntoView({behavior:'smooth'});">Login</button>
+        <button onclick="document.getElementById('coursePanel').scrollIntoView({behavior:'smooth'});">Courses</button>
+        <button onclick="document.getElementById('adminPanel').scrollIntoView({behavior:'smooth'});" id="quickAdmin" class="hidden">Admin</button>
+        <button onclick="document.getElementById('concurrencyPanel').scrollIntoView({behavior:'smooth'});">Concurrency</button>
+        <button onclick="document.getElementById('protocolPanel').scrollIntoView({behavior:'smooth'});">Protocol</button>
+        <button onclick="document.getElementById('encryptPanel').scrollIntoView({behavior:'smooth'});">Encryption</button>
+        <button onclick="document.getElementById('logPanel').scrollIntoView({behavior:'smooth'});">Log</button>
+    </div>
+    <div class="panel" id="loginPanel">
+        <div class="panel-header" onclick="togglePanel(this)">
+            <h2>Authentication</h2>
+            <span class="toggle-icon">▼</span>
+        </div>
+        <div class="panel-body">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Username</label>
+                    <input type="text" id="loginUser" placeholder="Enter username">
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="loginPass" placeholder="Enter password">
+                </div>
+                <button class="primary" onclick="doLogin()">Login</button>
+                <button onclick="doRegister()">Register</button>
+            </div>
+            <div class="user-info hidden" id="userInfo">
+                <span><span id="displayUser"></span></span>
+                <span class="role-badge" id="displayRole"></span>
+                <button id="logoutBtn" onclick="doLogout()" style="margin-left:auto;">Logout</button>
+            </div>
+        </div>
+    </div>
+    <div class="panel" id="coursePanel">
+        <div class="panel-header" onclick="togglePanel(this)">
+            <h2>Course Browser</h2>
+            <span class="toggle-icon">▼</span>
+        </div>
+        <div class="panel-body">
+            <div class="form-row">
+                <div class="form-group" style="flex:1;">
+                    <label>Search</label>
+                    <input type="text" id="searchQuery" placeholder="Search courses...">
+                </div>
+                <div class="form-group">
+                    <label>By</label>
+                    <select id="searchType">
+                        <option value="code">Course Code</option>
+                        <option value="instructor">Instructor</option>
+                        <option value="semester">Semester</option>
+                    </select>
+                </div>
+                <button class="primary" onclick="searchCourses()">Search</button>
+                <button onclick="loadCourses()">Refresh</button>
+            </div>
+            <div class="search-summary" id="searchSummary"></div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Code</th><th>Title</th><th>Sec</th>
+                            <th>Instructor</th><th>Semester</th>
+                            <th>Day</th><th>Start</th><th>End</th><th>Room</th>
+                        </tr>
+                    </thead>
+                    <tbody id="courseTable">
+                        <tr><td colspan="9" style="text-align:center;color:#8b949e;">Login to view courses</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="panel hidden" id="adminPanel">
+        <div class="panel-header" onclick="togglePanel(this)">
+            <h2>Admin Panel</h2>
+            <span class="toggle-icon">▼</span>
+        </div>
+        <div class="panel-body">
+            <div class="sub-section">
+                <h3>Add Course</h3>
+                <div class="form-row">
+                    <div class="form-group"><label>Semester</label>
+                        <select id="addSemester">
+                            <option value="">Select semester...</option>
+                            <option value="2025-2026">2025-2026</option>
+                            <option value="2026 Spring">2026 Spring</option>
+                            <option value="2026 Fall">2026 Fall</option>
+                            <option value="2027 Spring">2027 Spring</option>
+                            <option value="2027 Fall">2027 Fall</option>
+                        </select>
+                    </div>
+                    <div class="form-group"><label>Code</label><input id="addCode" placeholder="e.g. COMP3003" list="courseCodes"></div>
+                    <div class="form-group"><label>Title</label><input id="addTitle" placeholder="Course title"></div>
+                    <div class="form-group"><label>Section</label>
+                        <select id="addSection">
+                            <option value="">Select section...</option>
+                            <option value="01">01</option>
+                            <option value="02">02</option>
+                            <option value="1A">1A</option>
+                            <option value="1B">1B</option>
+                            <option value="2A">2A</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>Instructor</label>
+                        <select id="addInstructor">
+                            <option value="">Select instructor...</option>
+                            <option value="Dr. Chen">Dr. Chen</option>
+                            <option value="Dr. Li">Dr. Li</option>
+                            <option value="Dr. Wang">Dr. Wang</option>
+                            <option value="Dr. Zhang">Dr. Zhang</option>
+                            <option value="Dr. Liu">Dr. Liu</option>
+                            <option value="Dr. Smith">Dr. Smith</option>
+                            <option value="Dr. Test">Dr. Test</option>
+                        </select>
+                    </div>
+                    <div class="form-group"><label>Day</label>
+                        <select id="addDay">
+                            <option value="">Select day...</option>
+                            <option value="Mon">Mon</option>
+                            <option value="Tue">Tue</option>
+                            <option value="Wed">Wed</option>
+                            <option value="Thu">Thu</option>
+                            <option value="Fri">Fri</option>
+                        </select>
+                    </div>
+                    <div class="form-group"><label>Start</label>
+                        <select id="addStart">
+                            <option value="">Select start...</option>
+                            <option value="08:00">08:00</option>
+                            <option value="09:00">09:00</option>
+                            <option value="09:30">09:30</option>
+                            <option value="10:00">10:00</option>
+                            <option value="13:00">13:00</option>
+                            <option value="14:00">14:00</option>
+                            <option value="15:00">15:00</option>
+                            <option value="16:00">16:00</option>
+                        </select>
+                    </div>
+                    <div class="form-group"><label>End</label>
+                        <select id="addEnd">
+                            <option value="">Select end...</option>
+                            <option value="10:00">10:00</option>
+                            <option value="11:00">11:00</option>
+                            <option value="12:00">12:00</option>
+                            <option value="13:00">13:00</option>
+                            <option value="14:00">14:00</option>
+                            <option value="14:30">14:30</option>
+                            <option value="15:00">15:00</option>
+                            <option value="17:00">17:00</option>
+                        </select>
+                    </div>
+                    <div class="form-group"><label>Room</label>
+                        <select id="addRoom">
+                            <option value="">Select room...</option>
+                            <option value="A101">A101</option>
+                            <option value="A102">A102</option>
+                            <option value="B201">B201</option>
+                            <option value="B202">B202</option>
+                            <option value="C305">C305</option>
+                            <option value="D410">D410</option>
+                            <option value="E101">E101</option>
+                            <option value="E202">E202</option>
+                        </select>
+                    </div>
+                </div>
+                <button class="primary" onclick="doAddCourse()">Add Course</button>
+            </div>
+            <div class="sub-section">
+                <h3>Update Course</h3>
+                <div class="form-row">
+                    <div class="form-group"><label>Code</label><input id="updateCode" placeholder="Course code"></div>
+                    <div class="form-group"><label>Section</label><input id="updateSection" placeholder="Section"></div>
+                    <div class="form-group"><label>Field</label>
+                        <select id="updateField">
+                            <option value="course_title">Title</option>
+                            <option value="instructor">Instructor</option>
+                            <option value="day">Day</option>
+                            <option value="start_time">Start Time</option>
+                            <option value="end_time">End Time</option>
+                            <option value="classroom">Classroom</option>
+                            <option value="semester">Semester</option>
+                        </select>
+                    </div>
+                    <div class="form-group"><label>New Value</label><input id="updateValue" placeholder="New value"></div>
+                </div>
+                <button class="warning" onclick="doUpdateCourse()">Update</button>
+            </div>
+            <div class="sub-section">
+                <h3>Delete Course</h3>
+                <div class="form-row">
+                    <div class="form-group"><label>Code</label><input id="deleteCode" placeholder="Course code"></div>
+                    <div class="form-group"><label>Section</label><input id="deleteSection" placeholder="Section"></div>
+                </div>
+                <button class="danger" onclick="doDeleteCourse()">Delete</button>
+            </div>
+        </div>
+    </div>
+    <div class="panel" id="concurrencyPanel">
+        <div class="panel-header" onclick="togglePanel(this)">
+            <h2>Concurrency Tasks</h2>
+            <span class="toggle-icon">▼</span>
+        </div>
+        <div class="panel-body">
+            <div class="sub-section">
+                <h3>Connection Tasks</h3>
+                <div class="form-row">
+                    <button class="warning" onclick="runConcurrencyDemo()">Open 5 Connections</button>
+                    <button class="warning" onclick="runConcurrencyDemo(10)">Open 10 Connections</button>
+                    <button class="danger" onclick="closeAllDemoConnections()">Close All Demo Connections</button>
+                </div>
+            </div>
+            <div class="sub-section">
+                <h3>Query Tasks (via TCP connections)</h3>
+                <div class="form-row">
+                    <button onclick="runQueryOnConnections('LIST_ALL')">List All Courses</button>
+                    <button onclick="runQueryOnConnections('QUERY_CODE COMP3003')">Query COMP3003</button>
+                    <button onclick="runQueryOnConnections('QUERY_INSTRUCTOR Dr.Smith')">Query Dr.Smith</button>
+                    <button onclick="runQueryOnConnections('PING')">Ping</button>
+                </div>
+            </div>
+            <div class="sub-section">
+                <h3>Stress Test</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Number of connections</label>
+                        <input type="number" id="stressCount" value="20" min="1" max="100" style="width:80px;">
+                    </div>
+                    <button class="danger" onclick="runStressTest()">Stress Test</button>
+                    <button onclick="runSequentialTest()">Sequential Test (for comparison)</button>
+                </div>
+            </div>
+            <div class="status-grid" style="margin-bottom:10px;">
+                <div class="status-item">
+                    <div class="label">Active Connections</div>
+                    <div class="value highlight" id="activeCount">0</div>
+                </div>
+                <div class="status-item">
+                    <div class="label">Total Handled</div>
+                    <div class="value highlight" id="totalCount">0</div>
+                </div>
+                <div class="status-item">
+                    <div class="label">Demo Connections</div>
+                    <div class="value highlight" id="demoCount">0</div>
+                </div>
+                <div class="status-item">
+                    <div class="label">Model</div>
+                    <div class="value">Multi-thread</div>
+                </div>
+            </div>
+            <div class="table-container" style="max-height:200px;">
+                <table class="connection-table">
+                    <thead>
+                        <tr>
+                            <th>#</th><th>Address</th><th>User</th><th>Role</th><th>Since</th><th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="connectionTable">
+                        <tr><td colspan="6" style="text-align:center;color:#8b949e;">No active connections</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="form-row" style="margin-top:8px;">
+                <div class="form-group" style="flex:1;">
+                    <label>Task Results</label>
+                    <div class="protocol-console" id="concurrencyResults" style="max-height:150px;">
+                        <div class="line-info" style="color:#8b949e;">Click any task button above to see results here</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="panel" id="protocolPanel">
+        <div class="panel-header" onclick="togglePanel(this)">
+            <h2>Protocol Demo</h2>
+            <span class="toggle-icon">▼</span>
+        </div>
+        <div class="panel-body">
+            <div class="form-row">
+                <div class="form-group" style="flex:1;">
+                    <label>Send raw protocol command</label>
+                    <input type="text" id="protocolCmd" placeholder="e.g. QUERY_CODE COMP3003" value="QUERY_CODE COMP3003">
+                </div>
+                <button class="primary" onclick="sendProtocolCmd()">Send</button>
+                <button class="small" onclick="document.getElementById('protocolCmd').value='PING';sendProtocolCmd()">PING</button>
+                <button class="small" onclick="document.getElementById('protocolCmd').value='HELP';sendProtocolCmd()">HELP</button>
+                <button class="small" onclick="document.getElementById('protocolCmd').value='LIST_ALL';sendProtocolCmd()">LIST_ALL</button>
+                <button class="small" onclick="document.getElementById('protocolCmd').value='INVALID';sendProtocolCmd()">Test Error</button>
+            </div>
+            <div class="protocol-console" id="protocolConsole">
+                <div class="line-info" style="color:#8b949e;">Type a command above and click Send to see the raw protocol response</div>
+            </div>
+        </div>
+    </div>
+    <div class="panel" id="encryptPanel">
+        <div class="panel-header" onclick="togglePanel(this)">
+            <h2>Encryption Demo (XOR Cipher)</h2>
+            <span class="toggle-icon">▼</span>
+        </div>
+        <div class="panel-body">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Text</label>
+                    <input type="text" id="encryptText" placeholder="Enter text to encrypt" value="HelloWorld">
+                </div>
+                <div class="form-group">
+                    <label>Key</label>
+                    <input type="text" id="encryptKey" placeholder="Encryption key" value="key">
+                </div>
+                <button class="primary" onclick="doEncrypt()">Encrypt</button>
+                <button onclick="doDecrypt()">Decrypt</button>
+            </div>
+            <div class="encryption-steps" id="encryptResult">
+                <div class="step"><span class="step-label">Step 1:</span><span class="step-value">Enter text and key above, then click Encrypt</span></div>
+            </div>
+        </div>
+    </div>
+    <div class="panel" id="statusPanel">
+        <div class="panel-header" onclick="togglePanel(this)">
+            <h2>Server Status</h2>
+            <span class="toggle-icon">▼</span>
+        </div>
+        <div class="panel-body">
+            <div class="status-grid" id="statusGrid">
+                <div class="status-item"><div class="label">TCP Port</div><div class="value">54000</div></div>
+                <div class="status-item"><div class="label">HTTP Port</div><div class="value">8080</div></div>
+                <div class="status-item"><div class="label">Database</div><div class="value">CSV File</div></div>
+                <div class="status-item"><div class="label">Concurrency</div><div class="value">Multi-thread</div></div>
+                <div class="status-item"><div class="label">Encryption</div><div class="value">XOR Cipher</div></div>
+                <div class="status-item"><div class="label">Web UI</div><div class="value">HTML + JS</div></div>
+            </div>
+        </div>
+    </div>
+    <div class="panel" id="logPanel">
+        <div class="panel-header" onclick="togglePanel(this)">
+            <h2>System Log</h2>
+            <span class="toggle-icon">▼</span>
+        </div>
+        <div class="panel-body">
+            <div class="log-container" id="log">
+                <div class="log-entry"><span class="log-time">[System]</span> <span class="log-info">Welcome to Course Timetable System</span></div>
+            </div>
+            <button onclick="document.getElementById('log').innerHTML=''" style="margin-top:6px;">Clear Log</button>
+        </div>
+    </div>
+</div>
+<datalist id="courseCodes">
+    <option value="COMP1001">
+    <option value="COMP2001">
+    <option value="COMP3003">
+    <option value="COMP4002">
+    <option value="COMP4001">
+</datalist>
+<script>
+const API_BASE = '/api';
+let currentUser = null;
+let currentRole = '';
+let refreshTimer = null;
+
+function togglePanel(header) {
+    const body = header.nextElementSibling;
+    header.classList.toggle('collapsed');
+    body.classList.toggle('hidden');
+}
+
+function api(cmd, p1, p2) {
+    let url = API_BASE + '?cmd=' + encodeURIComponent(cmd);
+    if (p1 !== undefined) url += '&p1=' + encodeURIComponent(p1);
+    if (p2 !== undefined) url += '&p2=' + encodeURIComponent(p2);
+    if (currentUser) url += '&user=' + encodeURIComponent(currentUser);
+    if (currentRole) url += '&role=' + encodeURIComponent(currentRole);
+    return fetch(url).then(r => r.json()).then(d => d.response || d.error || 'ERROR');
+}
+
+function addLog(msg, type) {
+    const log = document.getElementById('log');
+    const time = new Date().toLocaleTimeString();
+    const entry = document.createElement('div');
+    entry.className = 'log-entry';
+    entry.innerHTML = '<span class="log-time">[' + time + ']</span> <span class="log-' + type + '">' + msg + '</span>';
+    log.appendChild(entry);
+    log.scrollTop = log.scrollHeight;
+}
+function showError(msg) { addLog(msg, 'error'); alert(msg); }
+function showSuccess(msg) { addLog(msg, 'success'); }
+
+function updateUI() {
+    const userInfo = document.getElementById('userInfo');
+    const adminPanel = document.getElementById('adminPanel');
+    const loginPanel = document.getElementById('loginPanel');
+    const quickAdmin = document.getElementById('quickAdmin');
+    const logoutBtn = document.getElementById('logoutBtn');
+    if (currentUser) {
+        loginPanel.classList.add('hidden');
+        userInfo.classList.remove('hidden');
+        document.getElementById('displayUser').textContent = currentUser;
+        document.getElementById('displayRole').textContent = currentRole;
+        document.getElementById('displayRole').className = 'role-badge ' + (currentRole === 'Admin' ? 'admin' : 'student');
+        logoutBtn.classList.remove('hidden');
+        adminPanel.classList.remove('hidden');
+        quickAdmin.classList.remove('hidden');
+        const isAdmin = currentRole === 'Admin';
+        var permBanner = document.getElementById('permBanner');
+        if (!isAdmin) {
+            if (!permBanner) {
+                permBanner = document.createElement('div');
+                permBanner.id = 'permBanner';
+                permBanner.style.cssText = 'background:#da3633;color:#fff;padding:8px 12px;border-radius:6px;margin-bottom:10px;font-size:12px;';
+                permBanner.innerHTML = 'You are logged in as <strong>Student</strong>. Admin operations require <strong>Admin</strong> privileges.<br>Click any button below to see the server return: <code style="background:#000;padding:2px 6px;border-radius:3px;">ERROR Permission denied</code>';
+                document.querySelector('#adminPanel .panel-body').insertBefore(permBanner, document.querySelector('#adminPanel .panel-body').firstChild);
+            }
+            permBanner.classList.remove('hidden');
+        } else {
+            if (permBanner) permBanner.classList.add('hidden');
+        }
+    } else {
+        loginPanel.classList.remove('hidden');
+        userInfo.classList.add('hidden');
+        logoutBtn.classList.add('hidden');
+        adminPanel.classList.add('hidden');
+        quickAdmin.classList.add('hidden');
+    }
+}
+
+function doLogin() {
+    const user = document.getElementById('loginUser').value.trim();
+    const pass = document.getElementById('loginPass').value.trim();
+    if (!user || !pass) { showError('Please enter username and password'); return; }
+    api('login', user, pass).then(r => {
+        if (r.startsWith('SUCCESS')) {
+            currentUser = user;
+            currentRole = r.includes('Admin') ? 'Admin' : 'Student';
+            updateUI();
+            showSuccess('Login: ' + user + ' (' + currentRole + ')');
+            loadCourses();
+        } else { showError('Login failed: ' + r); }
+    });
+}
+
+function doRegister() {
+    const user = document.getElementById('loginUser').value.trim();
+    const pass = document.getElementById('loginPass').value.trim();
+    if (!user || !pass) { showError('Please enter username and password'); return; }
+    if (user.length < 3) { showError('Username must be at least 3 characters'); return; }
+    if (pass.length < 4) { showError('Password must be at least 4 characters'); return; }
+    api('register', user, pass).then(r => {
+        if (r.startsWith('SUCCESS')) {
+            currentUser = user;
+            currentRole = r.includes('Admin') ? 'Admin' : 'Student';
+            updateUI();
+            showSuccess('Registered and logged in: ' + user + ' (' + currentRole + ')');
+            loadCourses();
+        } else { showError('Registration failed: ' + r); }
+    });
+}
+
+function doLogout() {
+    currentUser = null; currentRole = '';
+    updateUI();
+    showSuccess('Logged out');
+    document.getElementById('courseTable').innerHTML = '';
+    document.getElementById('searchSummary').textContent = '';
+}
+
+function loadCourses() {
+    if (!currentUser) { addLog('Please login first to view courses', 'error'); return; }
+    api('list').then(r => { displayCourses(r); showSuccess('Loaded all courses'); });
+}
+
+function searchCourses() {
+    if (!currentUser) { addLog('Please login first to search courses', 'error'); return; }
+    const query = document.getElementById('searchQuery').value.trim();
+    const type = document.getElementById('searchType').value;
+    if (!query) { loadCourses(); return; }
+    const cmd = type === 'code' ? 'query_code' : type === 'instructor' ? 'query_instructor' : 'query_semester';
+    api(cmd, query).then(r => { displayCourses(r); showSuccess('Search: ' + type + ' = ' + query); });
+}
+
+function displayCourses(response) {
+    const table = document.getElementById('courseTable');
+    const summary = document.getElementById('searchSummary');
+    if (!response || response === 'ERROR' || response.startsWith('ERROR')) {
+        table.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#f85149;">No results or error</td></tr>';
+        summary.textContent = '0 courses found'; return;
+    }
+    const lines = response.split('\n');
+    let courses = [];
+    let inResult = false;
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (line.startsWith('RESULT')) inResult = true;
+        else if (line === 'END') break;
+        else if (inResult && line.length > 0 && !line.startsWith('RESULT')) {
+            const parts = line.split('|');
+            if (parts.length >= 9) {
+                courses.push({
+                    semester: parts[0], code: parts[1], title: parts[2], section: parts[3],
+                    instructor: parts[4], day: parts[5], start: parts[6], end: parts[7], room: parts[8]
+                });
+            }
+        }
+    }
+    if (courses.length === 0) {
+        table.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#8b949e;">No courses found</td></tr>';
+        summary.textContent = '0 courses found'; return;
+    }
+    let html = '';
+    for (let i = 0; i < courses.length; i++) {
+        const c = courses[i];
+        html += '<tr><td>' + c.code + '</td><td>' + c.title + '</td><td>' + c.section +
+                '</td><td>' + c.instructor + '</td><td>' + c.semester +
+                '</td><td>' + c.day + '</td><td>' + c.start + '</td><td>' + c.end +
+                '</td><td>' + c.room + '</td></tr>';
+    }
+    table.innerHTML = html;
+    summary.textContent = courses.length + ' courses found';
+}
+
+function doAddCourse() {
+    const semester = document.getElementById('addSemester').value;
+    const code = document.getElementById('addCode').value.trim();
+    const title = document.getElementById('addTitle').value.trim();
+    const section = document.getElementById('addSection').value;
+    const instructor = document.getElementById('addInstructor').value;
+    const day = document.getElementById('addDay').value;
+    const start = document.getElementById('addStart').value;
+    const end = document.getElementById('addEnd').value;
+    const room = document.getElementById('addRoom').value;
+    if (!semester || !code || !title || !section || !instructor || !day || !start || !end || !room) {
+        showError('Please fill in all fields'); return;
+    }
+    const params = semester + '|' + code + '|' + title + '|' + section + '|' + instructor + '|' + day + '|' + start + '|' + end + '|' + room;
+    api('add', params).then(r => {
+        if (r.startsWith('OK')) {
+            showSuccess('Course added: ' + code);
+            loadCourses();
+        } else { showError('Add failed: ' + r); }
+    });
+}
+
+function doUpdateCourse() {
+    const code = document.getElementById('updateCode').value.trim();
+    const section = document.getElementById('updateSection').value.trim();
+    const field = document.getElementById('updateField').value;
+    const value = document.getElementById('updateValue').value.trim();
+    if (!code || !section || !value) { showError('Please fill in all fields'); return; }
+    const params = code + '|' + section + '|' + field + '|' + value;
+    api('update', params).then(r => {
+        if (r.startsWith('OK')) {
+            showSuccess('Course updated: ' + code);
+            loadCourses();
+        } else { showError('Update failed: ' + r); }
+    });
+}
+
+function doDeleteCourse() {
+    const code = document.getElementById('deleteCode').value.trim();
+    const section = document.getElementById('deleteSection').value.trim();
+    if (!code || !section) { showError('Please fill in all fields'); return; }
+    if (!confirm('Delete ' + code + ' section ' + section + '?')) return;
+    const params = code + '|' + section;
+    api('delete', params).then(r => {
+        if (r.startsWith('OK')) {
+            showSuccess('Course deleted: ' + code);
+            loadCourses();
+        } else { showError('Delete failed: ' + r); }
+    });
+}
+
+function sendProtocolCmd() {
+    const cmd = document.getElementById('protocolCmd').value.trim();
+    if (!cmd) return;
+    const console = document.getElementById('protocolConsole');
+    const reqLine = document.createElement('div');
+    reqLine.className = 'line-req';
+    reqLine.textContent = '> ' + cmd;
+    console.appendChild(reqLine);
+    api('raw', cmd).then(r => {
+        const resLine = document.createElement('div');
+        resLine.className = 'line-res';
+        resLine.textContent = r;
+        console.appendChild(resLine);
+        console.scrollTop = console.scrollHeight;
+    }).catch(err => {
+        const errLine = document.createElement('div');
+        errLine.className = 'line-err';
+        errLine.textContent = 'Error: ' + err;
+        console.appendChild(errLine);
+    });
+}
+
+function doEncrypt() {
+    const text = document.getElementById('encryptText').value;
+    const key = document.getElementById('encryptKey').value;
+    if (!text || !key) { showError('Please enter text and key'); return; }
+    api('encrypt', text + '|' + key).then(r => {
+        const container = document.getElementById('encryptResult');
+        const lines = r.split('\n');
+        let html = '';
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (line.startsWith('Original:')) {
+                html += '<div class="step"><span class="step-label">Original:</span><span class="step-value">' + line.substring(9) + '</span></div>';
+            } else if (line.startsWith('Key:')) {
+                html += '<div class="step"><span class="step-label">Key:</span><span class="step-value">' + line.substring(4) + '</span></div>';
+            } else if (line.startsWith('Encrypted')) {
+                html += '<div class="step"><span class="step-label">Encrypted (hex):</span><span class="step-value">' + line.substring(line.indexOf('[')) + '</span></div>';
+            } else if (line.startsWith('Decrypted')) {
+                html += '<div class="step"><span class="step-label">Decrypted:</span><span class="step-value">' + line.substring(line.indexOf('[')) + '</span></div>';
+            }
+        }
+        container.innerHTML = html || '<div class="step"><span class="step-value">No result</span></div>';
+    });
+}
+
+function doDecrypt() {
+    doEncrypt();
+}
+
+function refreshConcurrency() {
+    api('status').then(r => {
+        const match = r.match(/Active Connections: (\d+)/);
+        if (match) document.getElementById('activeCount').textContent = match[1];
+        const match2 = r.match(/Total Connections: (\d+)/);
+        if (match2) document.getElementById('totalCount').textContent = match2[1];
+    });
+    api('connections').then(r => {
+        const table = document.getElementById('connectionTable');
+        const lines = r.split('\n');
+        let html = '';
+        let count = 0;
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (line.includes('|')) {
+                const parts = line.split('|');
+                if (parts.length >= 4) {
+                    count++;
+                    const status = parts[2] === 'unknown' ? 'anonymous' : 'active';
+                    html += '<tr><td>' + count + '</td><td>' + parts[0] + '</td><td>' + parts[1] + '</td><td>' + parts[2] + '</td><td>' + parts[3] + '</td><td><span class="connection-badge ' + status + '">' + (status === 'active' ? 'Active' : 'Anon') + '</span></td></tr>';
+                }
+            }
+        }
+        if (count === 0) {
+            html = '<tr><td colspan="6" style="text-align:center;color:#8b949e;">No active connections</td></tr>';
+        }
+        table.innerHTML = html;
+        document.getElementById('demoCount').textContent = count;
+    });
+}
+
+function updateRefreshInterval() {
+    const val = parseInt(document.getElementById('refreshInterval').value);
+    if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; }
+    if (val > 0) { refreshTimer = setInterval(refreshConcurrency, val * 1000); }
+}
+
+function runConcurrencyDemo(count) {
+    if (!count) count = 5;
+    addLog('Opening ' + count + ' TCP connections...', 'info');
+    addConcurrencyResult('Opening ' + count + ' connections...', 'info');
+    api('demo_concurrency', String(count)).then(function(r) {
+        addLog('Demo started: ' + count + ' connections', 'success');
+        addConcurrencyResult(count + ' connections opened (will close in 30s)', 'success');
+        setTimeout(refreshConcurrency, 2000);
+    }).catch(function(err) {
+        addLog('Demo error: ' + err, 'error');
+        addConcurrencyResult('Error: ' + err, 'error');
+    });
+}
+
+function closeAllDemoConnections() {
+    addLog('Closing all demo connections...', 'info');
+    addConcurrencyResult('Closing all demo connections...', 'info');
+    api('close_demo').then(function(r) {
+        addLog('All demo connections closed', 'success');
+        addConcurrencyResult('All demo connections closed', 'success');
+        refreshConcurrency();
+    }).catch(function(err) {
+        addLog('Close error: ' + err, 'error');
+    });
+}
+
+function runQueryOnConnections(query) {
+    addLog('Running query on connections: ' + query, 'info');
+    addConcurrencyResult('Running: ' + query, 'info');
+    api('query_on_connections', query).then(function(r) {
+        addLog('Query result: ' + r.substring(0, 100), 'success');
+        addConcurrencyResult('Result: ' + r, 'success');
+    }).catch(function(err) {
+        addLog('Query error: ' + err, 'error');
+        addConcurrencyResult('Error: ' + err, 'error');
+    });
+}
+
+function runStressTest() {
+    var count = parseInt(document.getElementById('stressCount').value) || 20;
+    addLog('Stress test: opening ' + count + ' connections simultaneously...', 'info');
+    addConcurrencyResult('Stress test: ' + count + ' connections...', 'info');
+    var startTime = Date.now();
+    api('stress_test', String(count)).then(function(r) {
+        var elapsed = (Date.now() - startTime) / 1000;
+        addLog('Stress test completed in ' + elapsed.toFixed(2) + 's', 'success');
+        addConcurrencyResult('Stress test: ' + count + ' connections in ' + elapsed.toFixed(2) + 's', 'success');
+        setTimeout(refreshConcurrency, 2000);
+    }).catch(function(err) {
+        addLog('Stress test error: ' + err, 'error');
+        addConcurrencyResult('Stress test failed: ' + err, 'error');
+    });
+}
+
+function runSequentialTest() {
+    var count = parseInt(document.getElementById('stressCount').value) || 20;
+    addLog('Sequential test: opening ' + count + ' connections one by one...', 'info');
+    addConcurrencyResult('Sequential test: ' + count + ' connections...', 'info');
+    var startTime = Date.now();
+    api('sequential_test', String(count)).then(function(r) {
+        var elapsed = (Date.now() - startTime) / 1000;
+        addLog('Sequential test completed in ' + elapsed.toFixed(2) + 's', 'success');
+        addConcurrencyResult('Sequential: ' + count + ' connections in ' + elapsed.toFixed(2) + 's', 'success');
+        setTimeout(refreshConcurrency, 2000);
+    }).catch(function(err) {
+        addLog('Sequential test error: ' + err, 'error');
+        addConcurrencyResult('Sequential test failed: ' + err, 'error');
+    });
+}
+
+function addConcurrencyResult(msg, type) {
+    var container = document.getElementById('concurrencyResults');
+    var line = document.createElement('div');
+    if (type === 'error') line.className = 'line-err';
+    else if (type === 'success') line.className = 'line-res';
+    else line.className = 'line-req';
+    line.textContent = msg;
+    container.appendChild(line);
+    container.scrollTop = container.scrollHeight;
+}
+
+// Auto-refresh on load
+setTimeout(refreshConcurrency, 1000);
+setInterval(refreshConcurrency, 5000);
+</script>
+</body>
+</html>

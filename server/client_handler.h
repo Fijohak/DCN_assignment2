@@ -14,12 +14,15 @@ typedef int SOCKET;
 
 #include <string>
 
+class Server;  // Forward declaration
+
 class ClientHandler {
 public:
     ClientHandler(SOCKET clientSocket,
                   CourseDB& database,
                   Logger& logger,
-                  const std::string& clientAddress);
+                  const std::string& clientAddress,
+                  Server* server = nullptr);
 
     void operator()();
 
@@ -28,6 +31,7 @@ private:
     CourseDB& database;
     Logger& logger;
     std::string clientAddress;
+    Server* server;
     bool loggedIn;
     bool isAdmin;
     std::string username;
