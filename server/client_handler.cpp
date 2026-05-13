@@ -23,6 +23,29 @@ static std::string bytesToHex(const std::string& data) {
     return oss.str();
 }
 
+static std::string courseStatusToResponse(CourseWriteStatus status, const std::string& fallback) {
+    switch (status) {
+        case CourseWriteStatus::DuplicateKey:
+            return "ERROR Record already exists\r\n";
+        case CourseWriteStatus::NotFound:
+            return "ERROR Record not found\r\n";
+        case CourseWriteStatus::InvalidField:
+            return "ERROR Invalid field\r\n";
+        case CourseWriteStatus::InvalidValue:
+            return "ERROR Invalid value\r\n";
+        case CourseWriteStatus::InvalidTime:
+            return "ERROR Invalid time\r\n";
+        case CourseWriteStatus::InstructorConflict:
+            return "ERROR Instructor time conflict\r\n";
+        case CourseWriteStatus::ClassroomConflict:
+            return "ERROR Classroom time conflict\r\n";
+        case CourseWriteStatus::SaveFailed:
+            return "ERROR File save failed\r\n";
+        default:
+            return fallback;
+    }
+}
+
 ClientHandler::ClientHandler(SOCKET clientSocket,
                              CourseDB& database,
                              Logger& logger,
@@ -233,28 +256,31 @@ std::string ClientHandler::handleCommand(const std::string& line, bool& shouldCl
             course.endTime = request.fields[7];
             course.classroom = request.fields[8];
 
-            if (database.addCourse(course)) {
+            const CourseWriteStatus status = database.addCourseDetailed(course);
+            if (status == CourseWriteStatus::Success) {
                 logger.info(clientAddress + " ADD " + course.courseCode + " " + course.section);
                 return "OK Record added\r\n";
             }
 
-            return "ERROR Record already exists or could not be saved\r\n";
+            return courseStatusToResponse(status, "ERROR Record already exists or could not be saved\r\n");
         }
 
-        case CommandType::Update:
+        case CommandType::Update: {
             if (!loggedIn || !isAdmin) {
                 return "ERROR Permission denied\r\n";
             }
 
-            if (database.updateCourseField(request.fields[0],
-                                           request.fields[1],
-                                           request.fields[2],
-                                           request.fields[3])) {
+            const CourseWriteStatus status = database.updateCourseFieldDetailed(request.fields[0],
+                                                                                request.fields[1],
+                                                                                request.fields[2],
+                                                                                request.fields[3]);
+            if (status == CourseWriteStatus::Success) {
                 logger.info(clientAddress + " UPDATE " + request.fields[0] + " " + request.fields[1]);
                 return "OK Record updated\r\n";
             }
 
-            return "ERROR Record not found or invalid field\r\n";
+            return courseStatusToResponse(status, "ERROR Record not found or invalid field\r\n");
+        }
 
         case CommandType::DeleteCourse:
             if (!loggedIn || !isAdmin) {

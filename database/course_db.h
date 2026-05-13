@@ -23,6 +23,9 @@ enum class CourseWriteStatus {
     NotFound,
     InvalidField,
     InvalidValue,
+    InvalidTime,
+    InstructorConflict,
+    ClassroomConflict,
     SaveFailed
 };
 
@@ -67,9 +70,12 @@ private:
     mutable std::mutex dbMutex;
 
     bool saveToFileUnlocked() const;
+    CourseWriteStatus validateScheduleUnlocked(const Course& candidate,
+                                               const Course* self) const;
     static std::vector<std::string> parseCsvLine(const std::string& line);
     static std::string escapeCsvField(const std::string& value);
     static std::string toUpper(const std::string& text);
+    static bool parseTimeMinutes(const std::string& text, int& minutes);
 };
 
 #endif  // COURSE_DB_H

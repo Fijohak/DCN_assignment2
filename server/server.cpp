@@ -655,6 +655,18 @@ std::string Server::handleHttpRequest(const std::string& method,
                     logger.info("HTTP API: add -> ERROR File save failed (" + course.courseCode + " " + course.section + ")");
                     result = "ERROR File save failed";
                     break;
+                case CourseWriteStatus::InvalidTime:
+                    logger.info("HTTP API: add -> ERROR Invalid time (" + course.courseCode + " " + course.section + ")");
+                    result = "ERROR Invalid time";
+                    break;
+                case CourseWriteStatus::InstructorConflict:
+                    logger.info("HTTP API: add -> ERROR Instructor time conflict (" + course.courseCode + " " + course.section + ")");
+                    result = "ERROR Instructor time conflict";
+                    break;
+                case CourseWriteStatus::ClassroomConflict:
+                    logger.info("HTTP API: add -> ERROR Classroom time conflict (" + course.courseCode + " " + course.section + ")");
+                    result = "ERROR Classroom time conflict";
+                    break;
                 default:
                     logger.info("HTTP API: add -> ERROR Invalid course data (" + course.courseCode + " " + course.section + ")");
                     result = "ERROR Invalid course data";
@@ -684,6 +696,18 @@ std::string Server::handleHttpRequest(const std::string& method,
                 case CourseWriteStatus::InvalidValue:
                     logger.info("HTTP API: update -> ERROR Invalid value (" + req.fields[2] + "=" + req.fields[3] + ")");
                     result = "ERROR Invalid value";
+                    break;
+                case CourseWriteStatus::InvalidTime:
+                    logger.info("HTTP API: update -> ERROR Invalid time (" + req.fields[0] + " " + req.fields[1] + ")");
+                    result = "ERROR Invalid time";
+                    break;
+                case CourseWriteStatus::InstructorConflict:
+                    logger.info("HTTP API: update -> ERROR Instructor time conflict (" + req.fields[0] + " " + req.fields[1] + ")");
+                    result = "ERROR Instructor time conflict";
+                    break;
+                case CourseWriteStatus::ClassroomConflict:
+                    logger.info("HTTP API: update -> ERROR Classroom time conflict (" + req.fields[0] + " " + req.fields[1] + ")");
+                    result = "ERROR Classroom time conflict";
                     break;
                 case CourseWriteStatus::SaveFailed:
                     logger.info("HTTP API: update -> ERROR File save failed (" + req.fields[0] + " " + req.fields[1] + ")");

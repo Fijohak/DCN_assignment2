@@ -68,6 +68,12 @@ th {
 }
 td { padding: 6px 10px; border-bottom: 1px solid #21262d; }
 tr:hover td { background: #1c2128; }
+.course-row { cursor: pointer; }
+.course-row.selected td {
+    background: rgba(31, 111, 235, 0.2);
+    border-bottom-color: #388bfd;
+}
+.course-row.selected:hover td { background: rgba(31, 111, 235, 0.27); }
 .table-container { max-height: 350px; overflow-y: auto; border: 1px solid #30363d; border-radius: 6px; }
 .protocol-console, .encryption-steps {
     background: #0d1117; border: 1px solid #30363d; border-radius: 6px;
@@ -119,6 +125,11 @@ tr:hover td { background: #1c2128; }
 .connection-badge.active { background: #238636; color: #fff; }
 .connection-badge.anonymous { background: #484f58; color: #c9d1d9; }
 .search-summary { color: #8b949e; font-size: 12px; margin-bottom: 6px; }
+.course-selection-summary {
+    color: #8b949e; font-size: 12px; margin-bottom: 8px;
+    display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+}
+.course-selection-summary strong { color: #58a6ff; }
 .sub-section { margin-bottom: 12px; }
 .sub-section:last-child { margin-bottom: 0; }
 .sub-section h3 {
@@ -202,6 +213,9 @@ tr:hover td { background: #1c2128; }
                 <button onclick="loadCourses()">Refresh</button>
             </div>
             <div class="search-summary" id="searchSummary"></div>
+            <div class="course-selection-summary" id="selectedCourseSummary">
+                <span>Select a course row to prepare update or delete.</span>
+            </div>
             <div class="table-container">
                 <table>
                     <thead>
@@ -505,6 +519,7 @@ const API_BASE = '/api';
 let currentUser = null;
 let currentRole = '';
 let refreshTimer = null;
+let selectedCourse = null;
 
 function togglePanel(header) {
     const body = header.nextElementSibling;
@@ -613,6 +628,7 @@ function doLogout() {
         addLog('Logout API error: ' + err, 'error');
     });
     currentUser = null; currentRole = '';
+    clearCourseSelection(true);
     updateUI();
     showSuccess('Logged out');
     document.getElementById('courseTable').innerHTML = '';
@@ -626,6 +642,7 @@ function doExit() {
         showSuccess('Exiting system...');
         // Clear all state
         currentUser = null; currentRole = '';
+        clearCourseSelection(true);
         updateUI();
         document.getElementById('courseTable').innerHTML = '';
         document.getElementById('searchSummary').textContent = '';
@@ -690,9 +707,100 @@ function fillCourseKey(code, section) {
     document.getElementById('deleteSection').value = section;
 }
 
+function courseValueForField(course, field) {
+    if (!course) return '';
+    const fieldMap = {
+        course_title: 'title',
+        instructor: 'instructor',
+        day: 'day',
+        start_time: 'start',
+        end_time: 'end',
+        classroom: 'room',
+        semester: 'semester'
+    };
+    const key = fieldMap[field];
+    return key ? course[key] : '';
+}
+
+function renderSelectedCourseSummary() {
+    const summary = document.getElementById('selectedCourseSummary');
+    if (!summary) return;
+    if (!selectedCourse) {
+        summary.innerHTML = '<span>Select a course row to prepare update or delete.</span>';
+        return;
+    }
+    summary.innerHTML = '<span>Selected: <strong>' + escapeHtml(selectedCourse.code) +
+        '</strong> section <strong>' + escapeHtml(selectedCourse.section) +
+        '</strong> &middot; ' + escapeHtml(selectedCourse.title) + '</span>' +
+        '<span>' + escapeHtml(selectedCourse.day) + ' ' + escapeHtml(selectedCourse.start) +
+        '-' + escapeHtml(selectedCourse.end) + ' &middot; ' + escapeHtml(selectedCourse.room) + '</span>';
+}
+
+function syncSelectedCourseForms() {
+    if (!selectedCourse) return;
+    fillCourseKey(selectedCourse.code, selectedCourse.section);
+    const field = document.getElementById('updateField').value;
+    document.getElementById('updateValue').value = courseValueForField(selectedCourse, field);
+}
+
+function clearCourseSelection(clearInputs) {
+    selectedCourse = null;
+    const rows = document.querySelectorAll('#courseTable .course-row.selected');
+    for (let i = 0; i < rows.length; i++) {
+        rows[i].classList.remove('selected');
+    }
+    if (clearInputs) {
+        document.getElementById('updateCode').value = '';
+        document.getElementById('updateSection').value = '';
+        document.getElementById('updateValue').value = '';
+        document.getElementById('deleteCode').value = '';
+        document.getElementById('deleteSection').value = '';
+    }
+    renderSelectedCourseSummary();
+}
+
+function selectCourse(course, row) {
+    selectedCourse = course;
+    const rows = document.querySelectorAll('#courseTable .course-row');
+    for (let i = 0; i < rows.length; i++) {
+        rows[i].classList.remove('selected');
+    }
+    if (row) row.classList.add('selected');
+    syncSelectedCourseForms();
+    renderSelectedCourseSummary();
+}
+
+function updateSelectedFieldValue() {
+    if (!selectedCourse) return;
+    document.getElementById('updateValue').value =
+        courseValueForField(selectedCourse, document.getElementById('updateField').value);
+}
+
+function clearSelectionIfKeyEdited() {
+    if (!selectedCourse) return;
+    const updateCode = document.getElementById('updateCode').value.trim();
+    const updateSection = document.getElementById('updateSection').value.trim();
+    const deleteCode = document.getElementById('deleteCode').value.trim();
+    const deleteSection = document.getElementById('deleteSection').value.trim();
+    const updateChanged = updateCode !== selectedCourse.code || updateSection !== selectedCourse.section;
+    const deleteChanged = deleteCode !== selectedCourse.code || deleteSection !== selectedCourse.section;
+    if (updateChanged || deleteChanged) {
+        clearCourseSelection(false);
+    }
+}
+
+function installCourseSelectionHandlers() {
+    document.getElementById('updateField').addEventListener('change', updateSelectedFieldValue);
+    document.getElementById('updateCode').addEventListener('input', clearSelectionIfKeyEdited);
+    document.getElementById('updateSection').addEventListener('input', clearSelectionIfKeyEdited);
+    document.getElementById('deleteCode').addEventListener('input', clearSelectionIfKeyEdited);
+    document.getElementById('deleteSection').addEventListener('input', clearSelectionIfKeyEdited);
+}
+
 function displayCourses(response) {
     const table = document.getElementById('courseTable');
     const summary = document.getElementById('searchSummary');
+    clearCourseSelection(true);
     if (!response || response === 'ERROR' || response.startsWith('ERROR')) {
         table.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#f85149;">No results or error</td></tr>';
         summary.textContent = '0 courses found'; return;
@@ -733,9 +841,8 @@ function displayCourses(response) {
     table.innerHTML = html;
     const rows = table.querySelectorAll('.course-row');
     for (let i = 0; i < rows.length; i++) {
-        rows[i].style.cursor = 'pointer';
         rows[i].addEventListener('click', function() {
-            fillCourseKey(this.dataset.code, this.dataset.section);
+            selectCourse(courses[i], this);
         });
     }
     summary.textContent = courses.length + ' courses found';
@@ -790,6 +897,7 @@ function doDeleteCourse() {
     api('delete', params).then(r => {
         if (r.startsWith('OK')) {
             showSuccess('Course deleted: ' + code);
+            clearCourseSelection(true);
             loadCourses();
         } else { showError('Delete failed: ' + r); }
     });
@@ -964,6 +1072,7 @@ function addConcurrencyResult(msg, type) {
 }
 
 // Auto-refresh on load (longer interval to reduce server log noise)
+installCourseSelectionHandlers();
 setTimeout(refreshConcurrency, 2000);
 setInterval(refreshConcurrency, 30000);
 </script>

@@ -3,7 +3,5 @@ semester,course_code,course_title,section,instructor,day,start_time,end_time,cla
 2026 Spring,COMP3003,Operating Systems,02,Dr. Chen,Fri,10:00,12:00,B202
 2026 Spring,COMP2001,Data Structures,01,Dr. Li,Tue,09:30,11:00,A101
 2026 Fall,COMP2001,Data Structures,02,Dr. Wang,Thu,13:00,14:30,A102
-2026 Fall,COMP1001,Introduction to Programming,01,Dr. Zhang,Mon,08:00,10:00,C305
 2027 Spring,COMP4002,Computer Networks,01,Dr. Liu,Fri,15:00,17:00,D410
-2025-2026,COMP1001,ADD,1B,Dr. Chen,Mon,08:00,10:00,A101
-2025-2026,COMP1001,Test,02,Dr. Chen,Mon,08:00,10:00,A101
+2025-2026,COMP1002,Linear Algebra,01,Dr. Chen,Mon,08:00,10:00,A101

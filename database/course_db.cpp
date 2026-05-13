@@ -147,6 +147,11 @@ CourseWriteStatus CourseDB::addCourseDetailed(const Course& course) {
         }
     }
 
+    const CourseWriteStatus validation = validateScheduleUnlocked(course, NULL);
+    if (validation != CourseWriteStatus::Success) {
+        return validation;
+    }
+
     courses.push_back(course);
     if (!saveToFileUnlocked()) {
         courses.pop_back();
@@ -170,6 +175,14 @@ CourseWriteStatus CourseDB::updateCourseFieldDetailed(const std::string& code,
     std::lock_guard<std::mutex> lock(dbMutex);
 
     const std::string fieldName = toUpper(field);
+    const bool affectsSchedule =
+        fieldName == "CLASSROOM" ||
+        fieldName == "DAY" ||
+        fieldName == "START_TIME" ||
+        fieldName == "END_TIME" ||
+        fieldName == "INSTRUCTOR" ||
+        fieldName == "SEMESTER" ||
+        fieldName == "TIME";
 
     for (std::vector<Course>::iterator it = courses.begin(); it != courses.end(); ++it) {
         if (!isCourseKeyEqual(*it, code, section)) {
@@ -193,6 +206,15 @@ CourseWriteStatus CourseDB::updateCourseFieldDetailed(const std::string& code,
             const std::string newEndTime = timeRange.substr(dashPos + 1);
             if (newDay.empty() || newStartTime.empty() || newEndTime.empty()) {
                 return CourseWriteStatus::InvalidValue;
+            }
+
+            Course candidate = *it;
+            candidate.day = newDay;
+            candidate.startTime = newStartTime;
+            candidate.endTime = newEndTime;
+            const CourseWriteStatus validation = validateScheduleUnlocked(candidate, &(*it));
+            if (validation != CourseWriteStatus::Success) {
+                return validation;
             }
 
             const std::string oldDay = it->day;
@@ -233,6 +255,28 @@ CourseWriteStatus CourseDB::updateCourseFieldDetailed(const std::string& code,
         }
 
         const std::string oldValue = *targetField;
+        if (affectsSchedule) {
+            Course candidate = *it;
+            if (fieldName == "CLASSROOM") {
+                candidate.classroom = newValue;
+            } else if (fieldName == "DAY") {
+                candidate.day = newValue;
+            } else if (fieldName == "START_TIME") {
+                candidate.startTime = newValue;
+            } else if (fieldName == "END_TIME") {
+                candidate.endTime = newValue;
+            } else if (fieldName == "INSTRUCTOR") {
+                candidate.instructor = newValue;
+            } else if (fieldName == "SEMESTER") {
+                candidate.semester = newValue;
+            }
+
+            const CourseWriteStatus validation = validateScheduleUnlocked(candidate, &(*it));
+            if (validation != CourseWriteStatus::Success) {
+                return validation;
+            }
+        }
+
         *targetField = newValue;
 
         if (!saveToFileUnlocked()) {
@@ -325,6 +369,48 @@ bool CourseDB::saveToFileUnlocked() const {
     return !outFile.fail();
 }
 
+CourseWriteStatus CourseDB::validateScheduleUnlocked(const Course& candidate,
+                                                     const Course* self) const {
+    int candidateStart = 0;
+    int candidateEnd = 0;
+    if (!parseTimeMinutes(candidate.startTime, candidateStart) ||
+        !parseTimeMinutes(candidate.endTime, candidateEnd) ||
+        candidateStart >= candidateEnd) {
+        return CourseWriteStatus::InvalidTime;
+    }
+
+    for (std::vector<Course>::const_iterator it = courses.begin(); it != courses.end(); ++it) {
+        if (self != NULL && &(*it) == self) {
+            continue;
+        }
+        if (it->semester != candidate.semester || it->day != candidate.day) {
+            continue;
+        }
+
+        int existingStart = 0;
+        int existingEnd = 0;
+        if (!parseTimeMinutes(it->startTime, existingStart) ||
+            !parseTimeMinutes(it->endTime, existingEnd) ||
+            existingStart >= existingEnd) {
+            continue;
+        }
+
+        const bool overlaps = candidateStart < existingEnd && existingStart < candidateEnd;
+        if (!overlaps) {
+            continue;
+        }
+
+        if (it->instructor == candidate.instructor) {
+            return CourseWriteStatus::InstructorConflict;
+        }
+        if (it->classroom == candidate.classroom) {
+            return CourseWriteStatus::ClassroomConflict;
+        }
+    }
+
+    return CourseWriteStatus::Success;
+}
+
 std::vector<std::string> CourseDB::parseCsvLine(const std::string& line) {
     std::vector<std::string> fields;
     std::string current;
@@ -387,4 +473,23 @@ std::string CourseDB::toUpper(const std::string& text) {
     std::transform(result.begin(), result.end(), result.begin(),
                    [](unsigned char ch) { return static_cast<char>(std::toupper(ch)); });
     return result;
+}
+
+bool CourseDB::parseTimeMinutes(const std::string& text, int& minutes) {
+    if (text.size() != 5 || text[2] != ':' ||
+        !std::isdigit(static_cast<unsigned char>(text[0])) ||
+        !std::isdigit(static_cast<unsigned char>(text[1])) ||
+        !std::isdigit(static_cast<unsigned char>(text[3])) ||
+        !std::isdigit(static_cast<unsigned char>(text[4]))) {
+        return false;
+    }
+
+    const int hour = (text[0] - '0') * 10 + (text[1] - '0');
+    const int minute = (text[3] - '0') * 10 + (text[4] - '0');
+    if (hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+        return false;
+    }
+
+    minutes = hour * 60 + minute;
+    return true;
 }
