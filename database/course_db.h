@@ -17,6 +17,15 @@ struct Course {
     std::string classroom;
 };
 
+enum class CourseWriteStatus {
+    Success,
+    DuplicateKey,
+    NotFound,
+    InvalidField,
+    InvalidValue,
+    SaveFailed
+};
+
 std::string courseToString(const Course& course);
 
 class CourseDB {
@@ -32,12 +41,19 @@ public:
     std::vector<Course> getAllCourses() const;
 
     bool addCourse(const Course& course);
+    CourseWriteStatus addCourseDetailed(const Course& course);
     bool updateCourseField(const std::string& code,
                            const std::string& section,
                            const std::string& field,
                            const std::string& newValue);
+    CourseWriteStatus updateCourseFieldDetailed(const std::string& code,
+                                                const std::string& section,
+                                                const std::string& field,
+                                                const std::string& newValue);
     bool deleteCourse(const std::string& code,
                       const std::string& section);
+    CourseWriteStatus deleteCourseDetailed(const std::string& code,
+                                           const std::string& section);
 
     bool courseExists(const std::string& code,
                       const std::string& section) const;

@@ -135,27 +135,38 @@ std::vector<Course> CourseDB::getAllCourses() const {
 }
 
 bool CourseDB::addCourse(const Course& course) {
+    return addCourseDetailed(course) == CourseWriteStatus::Success;
+}
+
+CourseWriteStatus CourseDB::addCourseDetailed(const Course& course) {
     std::lock_guard<std::mutex> lock(dbMutex);
 
     for (std::vector<Course>::const_iterator it = courses.begin(); it != courses.end(); ++it) {
         if (isCourseKeyEqual(*it, course.courseCode, course.section)) {
-            return false;
+            return CourseWriteStatus::DuplicateKey;
         }
     }
 
     courses.push_back(course);
     if (!saveToFileUnlocked()) {
         courses.pop_back();
-        return false;
+        return CourseWriteStatus::SaveFailed;
     }
 
-    return true;
+    return CourseWriteStatus::Success;
 }
 
 bool CourseDB::updateCourseField(const std::string& code,
                                  const std::string& section,
                                  const std::string& field,
                                  const std::string& newValue) {
+    return updateCourseFieldDetailed(code, section, field, newValue) == CourseWriteStatus::Success;
+}
+
+CourseWriteStatus CourseDB::updateCourseFieldDetailed(const std::string& code,
+                                                      const std::string& section,
+                                                      const std::string& field,
+                                                      const std::string& newValue) {
     std::lock_guard<std::mutex> lock(dbMutex);
 
     const std::string fieldName = toUpper(field);
@@ -168,20 +179,20 @@ bool CourseDB::updateCourseField(const std::string& code,
         if (fieldName == "TIME") {
             const std::size_t commaPos = newValue.find(',');
             if (commaPos == std::string::npos) {
-                return false;
+                return CourseWriteStatus::InvalidValue;
             }
 
             const std::string newDay = newValue.substr(0, commaPos);
             const std::string timeRange = newValue.substr(commaPos + 1);
             const std::size_t dashPos = timeRange.find('-');
             if (dashPos == std::string::npos) {
-                return false;
+                return CourseWriteStatus::InvalidValue;
             }
 
             const std::string newStartTime = timeRange.substr(0, dashPos);
             const std::string newEndTime = timeRange.substr(dashPos + 1);
             if (newDay.empty() || newStartTime.empty() || newEndTime.empty()) {
-                return false;
+                return CourseWriteStatus::InvalidValue;
             }
 
             const std::string oldDay = it->day;
@@ -196,10 +207,10 @@ bool CourseDB::updateCourseField(const std::string& code,
                 it->day = oldDay;
                 it->startTime = oldStartTime;
                 it->endTime = oldEndTime;
-                return false;
+                return CourseWriteStatus::SaveFailed;
             }
 
-            return true;
+            return CourseWriteStatus::Success;
         }
 
         std::string* targetField = NULL;
@@ -218,7 +229,7 @@ bool CourseDB::updateCourseField(const std::string& code,
         } else if (fieldName == "SEMESTER") {
             targetField = &it->semester;
         } else {
-            return false;
+            return CourseWriteStatus::InvalidField;
         }
 
         const std::string oldValue = *targetField;
@@ -226,17 +237,22 @@ bool CourseDB::updateCourseField(const std::string& code,
 
         if (!saveToFileUnlocked()) {
             *targetField = oldValue;
-            return false;
+            return CourseWriteStatus::SaveFailed;
         }
 
-        return true;
+        return CourseWriteStatus::Success;
     }
 
-    return false;
+    return CourseWriteStatus::NotFound;
 }
 
 bool CourseDB::deleteCourse(const std::string& code,
                             const std::string& section) {
+    return deleteCourseDetailed(code, section) == CourseWriteStatus::Success;
+}
+
+CourseWriteStatus CourseDB::deleteCourseDetailed(const std::string& code,
+                                                 const std::string& section) {
     std::lock_guard<std::mutex> lock(dbMutex);
 
     for (std::vector<Course>::iterator it = courses.begin(); it != courses.end(); ++it) {
@@ -250,13 +266,13 @@ bool CourseDB::deleteCourse(const std::string& code,
 
         if (!saveToFileUnlocked()) {
             courses.insert(courses.begin() + index, backup);
-            return false;
+            return CourseWriteStatus::SaveFailed;
         }
 
-        return true;
+        return CourseWriteStatus::Success;
     }
 
-    return false;
+    return CourseWriteStatus::NotFound;
 }
 
 bool CourseDB::courseExists(const std::string& code,
@@ -279,6 +295,9 @@ bool CourseDB::saveToFileUnlocked() const {
     }
 
     outFile << kCsvHeader << '\n';
+    if (!outFile.good()) {
+        return false;
+    }
 
     for (std::vector<Course>::const_iterator it = courses.begin(); it != courses.end(); ++it) {
         outFile
@@ -298,7 +317,12 @@ bool CourseDB::saveToFileUnlocked() const {
     }
 
     outFile.flush();
-    return outFile.good();
+    if (!outFile.good()) {
+        return false;
+    }
+
+    outFile.close();
+    return !outFile.fail();
 }
 
 std::vector<std::string> CourseDB::parseCsvLine(const std::string& line) {

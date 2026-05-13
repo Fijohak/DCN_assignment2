@@ -677,6 +677,19 @@ function searchCourses() {
     api(cmd, query).then(r => { displayCourses(r); showSuccess('Search: ' + type + ' = ' + query); });
 }
 
+function escapeHtml(value) {
+    return String(value).replace(/[&<>"']/g, function(ch) {
+        return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[ch];
+    });
+}
+
+function fillCourseKey(code, section) {
+    document.getElementById('updateCode').value = code;
+    document.getElementById('updateSection').value = section;
+    document.getElementById('deleteCode').value = code;
+    document.getElementById('deleteSection').value = section;
+}
+
 function displayCourses(response) {
     const table = document.getElementById('courseTable');
     const summary = document.getElementById('searchSummary');
@@ -710,12 +723,21 @@ function displayCourses(response) {
     let html = '';
     for (let i = 0; i < courses.length; i++) {
         const c = courses[i];
-        html += '<tr><td>' + c.code + '</td><td>' + c.title + '</td><td>' + c.section +
-                '</td><td>' + c.instructor + '</td><td>' + c.semester +
-                '</td><td>' + c.day + '</td><td>' + c.start + '</td><td>' + c.end +
-                '</td><td>' + c.room + '</td></tr>';
+        html += '<tr class="course-row" data-code="' + escapeHtml(c.code) +
+                '" data-section="' + escapeHtml(c.section) + '"><td>' + escapeHtml(c.code) +
+                '</td><td>' + escapeHtml(c.title) + '</td><td>' + escapeHtml(c.section) +
+                '</td><td>' + escapeHtml(c.instructor) + '</td><td>' + escapeHtml(c.semester) +
+                '</td><td>' + escapeHtml(c.day) + '</td><td>' + escapeHtml(c.start) +
+                '</td><td>' + escapeHtml(c.end) + '</td><td>' + escapeHtml(c.room) + '</td></tr>';
     }
     table.innerHTML = html;
+    const rows = table.querySelectorAll('.course-row');
+    for (let i = 0; i < rows.length; i++) {
+        rows[i].style.cursor = 'pointer';
+        rows[i].addEventListener('click', function() {
+            fillCourseKey(this.dataset.code, this.dataset.section);
+        });
+    }
     summary.textContent = courses.length + ' courses found';
 }
 

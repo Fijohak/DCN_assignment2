@@ -1,317 +1,332 @@
 # Course Timetable Inquiry System
-
-## 项目简介
-
-本项目是一个基于 **Windows Socket Programming (Winsock)** 的 **C++ 客户端-服务器** 课程表查询系统。系统支持多用户并发访问，提供结构化的课程表数据存储与查询功能，并包含管理员权限控制与数据更新功能。同时提供 **Web UI** 界面，方便演示所有功能。
+## Data Communications and Networking -- Assignment 2
 
 ---
 
-## 快速开始
+## Project Overview
 
-### 方法一：使用一键启动脚本（推荐）
+A **client-server-based course timetable inquiry system** built with **Windows Socket Programming (Winsock) in C++**. The system supports multiple concurrent users, provides reliable access to structured timetable data stored in CSV files, and includes a modern **Web UI** for easy demonstration of all features.
 
-双击 **`start_system.bat`**，选择客户端类型：
+**Key Features:**
+- Multi-threaded TCP server handling concurrent client connections
+- Structured course database with CSV file storage
+- Role-based access control (Student / Administrator)
+- Real-time course CRUD operations (Create, Read, Update, Delete)
+- Built-in HTTP server for Web UI access
+- XOR encryption demo module
+- Concurrency stress testing tools
+
+---
+
+## Quick Start
+
+### Option 1: One-Click Launch (Recommended)
+
+Double-click **`start_system.bat`** and choose client type:
 
 ```
 Choose client type:
-  1. CMD Client (console)    ← 命令行界面
-  2. GUI Client (graphical)  ← 图形界面
+  1. CMD Client (console)    -- Command-line interface
+  2. GUI Client (graphical)  -- Win32 GUI interface
 Enter choice (1 or 2):
 ```
 
-脚本会自动：
-1. 检查可执行文件是否存在
-2. 启动服务器（最小化窗口）
-3. 等待 2 秒确保服务器就绪
-4. 启动客户端
-5. 关闭客户端后按任意键自动关闭服务器
+The script will automatically:
+1. Check if executables exist
+2. Start the server (minimized window)
+3. Wait 2 seconds for server readiness
+4. Launch the chosen client
+5. Auto-close server when client exits
 
-### 方法二：手动启动
+### Option 2: Manual Launch
 
-**1. 编译（如无可执行文件）：**
+**1. Compile (if executables are missing):**
 
 ```bash
-# 编译服务器
+# Compile server
 g++ -std=c++11 -pthread -o server.exe server/main.cpp server/server.cpp server/client_handler.cpp server/protocol.cpp server/auth.cpp server/logger.cpp database/course_db.cpp database/user_db.cpp -lws2_32
-```
 
-如果系统已安装make工具，也可以使用 Makefile：
-```bash
+# Or use Makefile
 make
 ```
 
-**2. 启动服务器：**
+**2. Start the server:**
 ```bash
 server.exe
 ```
-服务器默认监听 TCP 端口 **54000**，HTTP 端口 **8080**（Web UI）。
 
-**3. 访问 Web UI：**
-打开浏览器访问 **http://localhost:8080**
+**3. Access Web UI:**
+Open browser -> **http://localhost:8080**
 
 ---
 
-## 项目结构
+## Web UI Access
+
+The server includes a built-in HTTP server on **port 8080**. Simply open a browser and navigate to `http://localhost:8080` to access the full-featured Web interface.
+
+**No additional web server or dependencies required!**
+
+---
+
+## Project Structure
 
 ```
 DCN_assignment2/
-├── server/
-│   ├── main.cpp                 # 服务器入口
-│   ├── server.cpp / server.h    # 服务器核心（TCP + HTTP）
-│   ├── client_handler.cpp/.h    # 客户端连接处理
-│   ├── protocol.cpp / protocol.h# 通信协议解析
-│   ├── auth.cpp / auth.h        # 用户认证
-│   └── logger.cpp / logger.h    # 日志系统
-├── database/
-│   ├── course_db.cpp / .h       # 课程数据库（CSV）
-│   ├── user_db.cpp / .h         # 用户数据库（CSV）
-│   ├── courses.csv              # 课程数据文件
-│   └── users.csv                # 用户数据文件
-├── gui_web/
-│   └── index.html               # Web UI 界面
-├── include/
-│   ├── common.h                 # 公共数据结构
-│   ├── protocol.h               # 协议定义
-│   └── network_client.h         # 网络客户端
-├── client/
-│   ├── client.cpp               # CMD 客户端
-│   ├── gui_client.cpp           # GUI 客户端（Win32 API）
-│   └── network_client.cpp       # 网络通信层
-├── logs/
-│   └── server.log               # 服务器运行日志
-├── Makefile                     # 编译脚本
-├── README.md                    # 本文件
-├── start_system.bat             # 一键启动脚本
-└── test_client.bat              # 测试批处理文件
+│
+├── server/                          # Server-side source code
+│   ├── main.cpp                     # Server entry point
+│   ├── server.cpp / server.h        # Core server (TCP + HTTP)
+│   ├── client_handler.cpp / .h      # Client connection handler
+│   ├── protocol.cpp / protocol.h    # Communication protocol parser
+│   ├── auth.cpp / auth.h            # User authentication
+│   └── logger.cpp / logger.h        # Logging system
+│
+├── database/                        # Database layer
+│   ├── course_db.cpp / .h           # Course database (CSV-based)
+│   ├── user_db.cpp / .h             # User database (CSV-based)
+│   ├── courses.csv                  # Course data file
+│   └── users.csv                    # User data file
+│
+├── gui_web/                         # Web UI
+│   └── index.html                   # Single-page Web application
+│
+├── include/                         # Shared headers
+│   ├── common.h                     # Common data structures
+│   ├── protocol.h                   # Protocol definitions
+│   └── network_client.h             # Network client abstraction
+│
+├── client/                          # Client applications
+│   ├── client.cpp                   # Console-based client
+│   ├── gui_client.cpp               # Win32 GUI client
+│   └── network_client.cpp           # Network communication layer
+│
+├── logs/                            # Server logs
+│   └── server.log                   # Runtime log file
+│
+├── Makefile                         # Build automation
+├── README.md                        # This document
+├── start_system.bat                 # One-click launcher
+└── test_client.bat                  # Test batch file
 ```
 
 ---
 
-## 默认账号
+## Default Accounts
 
-| 角色 | 用户名 | 密码 | 权限 |
-|------|--------|------|------|
-| 学生 | `student` | `student123` | 仅查询 |
-| 管理员 | `admin` | `admin123` | 查询 + 增删改 |
+| Role | Username | Password | Permissions |
+|------|----------|----------|-------------|
+| **Student** | `student` | `student123` | Query only |
+| **Administrator** | `admin` | `admin123` | Full access (CRUD) |
 
-> **新用户注册**：在 Web UI 或 CMD 客户端中注册新账号（默认注册为学生角色）。用户数据存储在 `database/users.csv` 文件中，服务器重启后仍然保留。
-
----
-
-## Web UI 使用流程
-
-### 1. 登录/注册
-- 在 **Authentication** 面板输入用户名和密码
-- 点击 **Login** 登录，或 **Register** 注册新账号
-- 登录后显示用户信息和角色（Student/Admin）
-
-### 2. 查询课程
-- 在 **Course Browser** 面板选择搜索类型（Course Code / Instructor / Semester）
-- 输入关键词，点击 **Search**
-- 或直接点击 **Refresh** 查看所有课程
-- 结果以表格形式清晰显示
-
-### 3. 管理员操作（需以 admin 登录）
-- **Add Course**：填写学期、代码、标题、Section、教师、时间、教室，点击 Add
-- **Update Course**：输入代码和 Section，选择要修改的字段，输入新值，点击 Update
-- **Delete Course**：输入代码和 Section，点击 Delete（确认后删除）
-
-### 4. 并发演示
-- **Concurrency Tasks** 面板展示多线程并发能力
-- **Open 5/10 Connections**：打开多个持久 TCP 连接
-- **Stress Test**：同时打开多个连接进行压力测试
-- **Sequential Test**：逐个打开连接进行对比测试
-- 实时显示 Active Connections / Total Handled 数据
-
-### 5. 协议演示
-- **Protocol Demo** 面板可发送原始协议命令
-- 支持 PING、HELP、LIST_ALL 等快速按钮
-- 显示服务器原始响应
-
-### 6. 加密演示
-- **Encryption Demo** 面板展示 XOR 加密/解密
-- 输入文本和密钥，点击 Encrypt 查看加密过程
-
-### 7. Logout / Exit / Reconnect
-- **Logout**：清除登录状态，保留连接
-- **Exit**：关闭连接，显示断开状态
-- **Reconnect**：重新连接服务器
+> **New user registration**: Users can self-register via the Web UI or CMD client. New accounts default to Student role. User data persists in `database/users.csv` across server restarts.
 
 ---
 
-## 功能模块与老师要求对照
+## Functional Requirements -- Implementation Details
 
-### (1) 数据库模块 ✅
+### (1) Database Module
 
-**老师要求：**
-- 存储课程表数据：课程代码、课程名称、Section、教师、时间（天和时长）、教室
-- 可使用文件存储（CSV、TXT）或嵌入式数据库（SQLite）
+**Requirement:**
+- Store course timetable data: Course code, Course title, Section, Instructor, Time (day and duration), Classroom
+- File-based storage (CSV, TXT) or embedded database (SQLite)
 
-**实现方式：**
-- 使用 **CSV 文件** (`database/courses.csv`) 存储课程数据
-- 每条记录包含 9 个字段：`semester, course_code, course_title, section, instructor, day, start_time, end_time, classroom`
-- 服务器启动时从 CSV 加载数据到内存，修改后自动保存回 CSV
-- 使用 `std::mutex` 保证多线程并发访问时的数据安全
+**Implementation:**
+- **CSV file storage** (`database/courses.csv`) with 9 fields:
+  - `semester`, `course_code`, `course_title`, `section`, `instructor`, `day`, `start_time`, `end_time`, `classroom`
+- Data loaded into memory at server startup for fast access
+- All modifications immediately persisted to CSV file
+- **Thread-safe** with `std::mutex` for concurrent access protection
 
-**示例数据：**
+**Sample data:**
 ```
 semester,course_code,course_title,section,instructor,day,start_time,end_time,classroom
-2025-2026,COMP3003,Data Communications and Networking,02,Dr. Johnson,Wed,14:00,16:00,Room 302
-2025-2026,COMP2002,Operating Systems,01,Prof. Lee,Tue,09:00,11:00,Room 201
+2026 Spring,COMP3003,Operating Systems,01,Dr. Chen,Mon,10:00,12:00,B201
+2026 Spring,COMP3003,Operating Systems,02,Dr. Chen,Fri,10:00,12:00,B202
+2026 Spring,COMP2001,Data Structures,01,Dr. Li,Tue,09:30,11:00,A101
+2026 Fall,COMP2001,Data Structures,02,Dr. Wang,Thu,13:00,14:30,A102
+2026 Fall,COMP1001,Introduction to Programming,01,Dr. Zhang,Mon,08:00,10:00,C305
+2027 Spring,COMP4002,Computer Networks,01,Dr. Liu,Fri,15:00,17:00,D410
 ```
 
-**对应代码位置：** `database/course_db.cpp`
+**Source code:** `database/course_db.cpp`, `database/course_db.h`
 
 ---
 
-### (2) 查询模块 ✅
+### (2) Query Module
 
-**老师要求：**
-- 按课程代码搜索
-- 按教师搜索
-- 查看某学期的所有课程
-- 以清晰可读的格式显示结果
+**Requirement:**
+- Search by course code
+- Search by instructor
+- View all courses for a given semester
+- Display results in clear, readable format
 
-**实现方式：**
-- **按课程代码搜索**：`QUERY_CODE <code>`，返回匹配的所有 Section
-- **按教师搜索**：`QUERY_INSTRUCTOR <name>`，支持部分匹配
-- **按学期搜索**：`QUERY_SEMESTER <semester>`，查看某学期所有课程
-- **查看所有课程**：`LIST_ALL`，显示数据库中全部课程记录
-- **结果格式**：管道符分隔的 9 字段格式，Web UI 以表格展示
+**Implementation:**
 
-**Web UI 操作：**
-- 在 Course Browser 面板选择搜索类型，输入关键词，点击 Search
-- 结果以表格显示：Code | Title | Sec | Instructor | Semester | Day | Start | End | Room
+| Query Type | Command |
+|------------|---------|
+| All courses | `LIST_ALL` |
+| By course code | `QUERY_CODE <code>`|
+| By instructor | `QUERY_INSTRUCTOR <name>`|
+| By semester | `QUERY_SEMESTER <semester>`|
 
-**对应代码位置：**
-- 协议解析：`server/protocol.cpp`
-- 数据库查询：`database/course_db.cpp`
-- Web UI：`gui_web/index.html`
+**Response format:** Pipe-delimited 9-field records wrapped in `RESULT...END` block
 
----
+**Web UI:** Results displayed in a sortable table with columns: Code | Title | Sec | Instructor | Semester | Day | Start | End | Room
 
-### (3) 用户管理模块 ✅
-
-**老师要求：**
-- 支持至少两种角色：学生（默认，仅查询）和管理员（完全访问）
-- 管理员功能：添加、更新、删除课程记录
-- 管理员访问需要身份验证（用户名/密码）
-
-**实现方式：**
-- **两种角色**：
-  - `Student`（学生）：登录后只能查询课程
-  - `Admin`（管理员）：登录后可查询、添加、更新、删除课程
-- **身份验证**：使用用户名和密码登录，服务器验证后返回角色信息
-- **会话管理**：服务器端维护登录状态，未登录用户无法执行任何操作
-- **数据持久化**：用户数据存储在 `database/users.csv`，服务器重启后保留
-- **用户注册**：新用户可自行注册账号（默认学生角色）
-
-**Web UI 操作：**
-- 在 Authentication 面板输入用户名密码，点击 Login 或 Register
-- 登录后显示角色标签（Admin/Student）
-- Student 登录后 Admin Panel 显示权限提示
-- Admin 登录后可使用 Add/Update/Delete 功能
-
-**对应代码位置：**
-- 用户认证：`server/auth.cpp`
-- 权限检查：`server/client_handler.cpp` 中每个命令前的 `if (!loggedIn || !isAdmin)` 检查
+**Source code:** `server/protocol.cpp` (parsing), `database/course_db.cpp` (queries), `gui_web/index.html` (display)
 
 ---
 
-### (4) 信息更新模块 ✅
+### (3) User Management Module
 
-**老师要求：**
-- 管理员可修改特定字段（如时间或教室）
-- 添加新的课程条目
-- 删除过时的条目
-- 更改必须立即对所有连接的客户端生效
+**Requirement:**
+- Support at least two roles: Student (default, query-only) and Administrator (full access)
+- Administrator functions: add, update, delete timetable records
+- Authentication (username/password) required for administrator access
 
-**实现方式：**
-- **添加课程**：`ADD <semester>|<code>|<title>|<section>|<instructor>|<day>|<start>|<end>|<room>`
-- **更新课程**：`UPDATE <code>|<section>|<field>|<newvalue>`（支持 7 个字段）
-- **删除课程**：`DELETE <code>|<section>`
-- **即时生效**：所有修改立即写入 CSV 文件，后续查询直接从内存读取最新数据
+**Implementation:**
+- **Two roles with distinct permissions:**
+  - `Student`: Query-only access after login
+  - `Admin`: Full CRUD access after login
+- **Authentication flow:**
+  1. Client sends `LOGIN <username> <password>`
+  2. Server validates against `database/users.csv`
+  3. Server returns `SUCCESS Login successful. Role: <role>` or `FAILURE Invalid username or password`
+- **Session management:** Server maintains login state per connection
+- **User registration:** `REGISTER <username> <password>` creates new Student account
+- **Data persistence:** User data stored in `database/users.csv`, survives server restarts
 
-**Web UI 操作：**
-- **Add**：在 Admin Panel 填写所有字段，点击 Add Course
-- **Update**：输入 Code 和 Section，选择字段（Title/Instructor/Day/Start/End/Room/Semester），输入新值
-- **Delete**：输入 Code 和 Section，点击 Delete（确认后删除）
+**Permission enforcement:**
+```cpp
+// In client_handler.cpp -- every admin command checks:
+if (!loggedIn || !isAdmin) {
+    return "ERROR Permission denied\r\n";
+}
+```
 
-**对应代码位置：** `database/course_db.cpp` 中的 `addCourse()`、`updateCourseField()`、`deleteCourse()`
+**Web UI behavior:**
+- Student login: Admin Panel shows permission warning banner
+- Admin login: Full Add/Update/Delete functionality enabled
+
+**Source code:** `server/auth.cpp`, `server/auth.h`, `server/client_handler.cpp`
 
 ---
 
-### (5) 网络与并发模块 ✅
+### (4) Information Update Module
 
-**老师要求：**
-- 使用 Windows Sockets (Winsock) 实现
-- 支持至少 5 个并发客户端连接
-- 使用多线程（如 std::thread）或 I/O 多路复用（如 select()）
+**Requirement:**
+- Administrators can modify specific fields (e.g., time or classroom)
+- Add new course entries
+- Delete outdated entries
+- Changes must be reflected immediately for all connected clients
 
-**实现方式：**
-- **Winsock**：使用 `WSAStartup`、`socket`、`bind`、`listen`、`accept` 等标准 Winsock API
-- **多线程**：每个客户端连接创建一个独立的 `std::thread` 处理
-- **并发支持**：服务器 `listen` 的 backlog 设置为 5，支持多个客户端同时连接
-- **线程安全**：使用 `std::mutex` 保护共享数据（课程列表和用户数据）
-- **HTTP 服务器**：内嵌 HTTP 服务器（端口 8080）提供 Web UI
 
-**Web UI 演示：**
-- Concurrency Tasks 面板可打开多个持久 TCP 连接
-- Stress Test 同时打开 20+ 连接测试并发能力
-- 实时显示 Active Connections / Total Handled 数据
+**Supported update fields:** `course_title`, `instructor`, `day`, `start_time`, `end_time`, `classroom`, `semester`
 
-**服务器启动输出：**
+**Immediate effect:** All modifications are:
+1. Written to CSV file immediately
+2. Reflected in subsequent queries from memory
+3. Visible to all connected clients on next query
+
+**Source code:** `database/course_db.cpp` (`addCourse()`, `updateCourseField()`, `deleteCourse()`)
+
+---
+
+### (5) Networking and Concurrency Module
+
+**Requirement:**
+- Implement using Windows Sockets (Winsock) in C++
+- Support at least 5 concurrent client connections
+- Use multithreading (e.g., std::thread) or I/O multiplexing (e.g., select())
+
+**Implementation:**
+
+**Architecture:**
+```
++---------------------------------------------------+
+|                   Server                          |
+|  +-------------+  +-------------+                 |
+|  | TCP Server  |  | HTTP Server |                 |
+|  | (Port 54000)|  | (Port 8080) |                 |
+|  +------+------+  +------+------+                 |
+|         |                |                        |
+|  +------+------+  +------+------+                 |
+|  | std::thread |  | std::thread |                 |
+|  | per client  |  | per request |                 |
+|  +-------------+  +-------------+                 |
+|                                                   |
+|  +--------------------------------------------+   |
+|  |         CourseDB (thread-safe)             |   |
+|  |         protected by std::mutex            |   |
+|  +--------------------------------------------+   |
++---------------------------------------------------+
+```
+
+**Key technical details:**
+- **Winsock API:** `WSAStartup`, `socket()`, `bind()`, `listen()`, `accept()`, `send()`, `recv()`
+- **Multithreading:** Each client connection spawns a `std::thread`
+- **Backlog:** Server `listen()` backlog set to 5 (minimum requirement)
+- **Thread safety:** `std::mutex` protects shared CourseDB and UserDB
+- **Built-in HTTP server:** Serves Web UI on port 8080
+
+**Concurrency demonstration tools (in Web UI):**
+- **Open 5/10 Connections:** Creates persistent TCP connections that stay alive
+- **Stress Test:** Opens N connections simultaneously to test concurrent handling
+- **Sequential Test:** Opens N connections one-by-one for comparison
+- **Real-time monitoring:** Active Connections / Total Handled counters
+
+**Server startup output:**
 ```
 Course Timetable Server running on port 54000
 HTTP Server listening on port 8080
 Press Ctrl+C to stop the server.
 ```
 
-**对应代码位置：** `server/server.cpp`（TCP 服务器 + HTTP 服务器）
+**Source code:** `server/server.cpp`
 
 ---
 
-### (6) 通信协议 ✅
+### (6) Communication Protocol
 
-**老师要求：**
-- 定义简单的应用层协议
-- 包含请求格式、响应格式和错误消息
+**Requirement:**
+- Define a simple application-layer protocol
+- Include request format, response format, and error messages
 
-**实现方式：**
+**Implementation:**
 
-**请求格式：**
+#### Request Format
 ```
-PING                              # 测试连接
-HELP                              # 显示帮助
-QUIT                              # 断开连接
-LOGIN <username> <password>       # 登录
-LOGOUT                            # 登出
-EXIT                              # 退出系统
-REGISTER <username> <password>    # 注册新用户
-LIST_ALL                          # 查看所有课程
-QUERY_CODE <code>                 # 按课程代码查询
-QUERY_INSTRUCTOR <name>           # 按教师查询
-QUERY_SEMESTER <semester>         # 按学期查询
-ADD <sem>|<code>|<title>|<sec>|<inst>|<day>|<start>|<end>|<room>  # 添加课程（管理员）
-UPDATE <code>|<sec>|<field>|<val> # 更新课程（管理员）
-DELETE <code>|<sec>               # 删除课程（管理员）
-ENCRYPT <text>|<key>              # XOR 加密演示
-STATUS                            # 服务器状态
-CONNECTIONS                       # 活跃连接
-```
-
-**响应格式：**
-```
-SUCCESS <message>                 # 操作成功
-FAILURE <reason>                  # 操作失败
-ERROR <message>                   # 错误
-OK <message>                      # 操作成功
-RESULT count=N                    # 查询结果开始
-<data>                            # 数据行（管道符分隔）
-END                               # 查询结果结束
+PING                              # Connection test
+HELP                              # Display help
+QUIT                              # Disconnect
+LOGIN <username> <password>       # Authenticate
+LOGOUT                            # Clear login state
+EXIT                              # Close connection
+REGISTER <username> <password>    # Create new account
+LIST_ALL                          # View all courses
+QUERY_CODE <code>                 # Search by course code
+QUERY_INSTRUCTOR <name>           # Search by instructor
+QUERY_SEMESTER <semester>         # Search by semester
+ADD <sem>|<code>|<title>|<sec>|<inst>|<day>|<start>|<end>|<room>  # Add course (Admin)
+UPDATE <code>|<sec>|<field>|<val> # Update course (Admin)
+DELETE <code>|<sec>               # Delete course (Admin)
+ENCRYPT <text>|<key>              # XOR encryption demo
+STATUS                            # Server status
+CONNECTIONS                       # Active connections list
 ```
 
-**错误处理示例：**
+#### Response Format
+```
+SUCCESS <message>                 # Operation succeeded
+FAILURE <reason>                  # Operation failed (auth)
+ERROR <message>                   # Error occurred
+OK <message>                      # Simple success
+RESULT count=N                    # Query result header
+<data>                            # Pipe-delimited data rows
+END                               # Query result footer
+```
+
+#### Error Handling Examples
 ```
 > INVALID COMMAND
 ERROR Invalid command
@@ -321,105 +336,137 @@ ERROR Please login first
 
 > ADD test course
 ERROR Permission denied
+
+> LOGIN wrong pass
+FAILURE Invalid username or password
 ```
 
-**对应代码位置：** `server/protocol.cpp`（协议解析），`server/client_handler.cpp`（命令处理）
+**Source code:** `server/protocol.cpp` (parser), `server/client_handler.cpp` (command execution)
 
 ---
 
-### (7) 非功能性需求 ✅
+### (7) Non-Functional Requirements
 
-**老师要求：**
-- 处理无效或格式错误的请求，防止崩溃
-- 合理的响应时间
-- 清晰模块化的代码结构
+**Requirement:**
+- Handle invalid or malformed requests gracefully
+- Prevent crashes from unexpected input
+- Ensure reasonable response time under concurrent access
+- Maintain clean, modular code structure
 
-**实现方式：**
-- **错误处理**：所有命令都有参数数量检查，返回明确的错误消息
-- **输入验证**：服务器端 `trim()` 去除多余空白字符，`toUpper()` 统一命令大小写
-- **响应时间**：查询直接在内存中进行，无需磁盘 I/O
-- **代码结构**：模块化设计（server/、database/、gui_web/ 分离），代码注释清晰
+**Implementation:**
 
----
-
-### (8) Bonus 功能 ✅ 全部实现
-
-**老师列出的 Bonus 功能：**
-
-| Bonus 功能 | 状态 | 说明 |
-|-----------|------|------|
-| 图形用户界面 (GUI) | ✅ **已实现** | Web UI（HTML + CSS + JS）+ Win32 API GUI 客户端 |
-| 高级搜索 | ✅ **已实现** | 按 Course Code / Instructor / Semester 搜索 |
-| 数据缓存 | ✅ **已实现** | 服务器端内存缓存，Concurrency 面板实时显示 |
-| 加密通信 | ✅ **已实现** | XOR 加密演示面板 |
+| Requirement | Implementation |
+|-------------|---------------|
+| **Error handling** | All commands validate parameter count; returns descriptive error messages |
+| **Input validation** | `trim()` removes whitespace; `toUpper()` normalizes commands; buffer overflow protection (4096 byte limit) |
+| **Response time** | In-memory queries -- no disk I/O during search operations |
+| **Code structure** | Modular design: `server/`, `database/`, `gui_web/`, `client/` separation; clear comments throughout |
+| **Crash prevention** | Try-catch around thread operations; socket error handling; graceful degradation |
 
 ---
 
-## 通信协议示例
 
-### 学生查询流程
+
+## Protocol Communication Examples
+
+### Student Query Flow
 ```
-客户端 → 服务器: LOGIN student student123
-服务器 → 客户端: SUCCESS Login successful. Role: Student
+-> LOGIN student student123
+<- SUCCESS Login successful. Role: Student
 
-客户端 → 服务器: QUERY_CODE COMP3003
-服务器 → 客户端: RESULT count=1
-2025-2026|COMP3003|Data Communications and Networking|02|Dr. Johnson|Wed|14:00|16:00|Room 302
-END
+-> LIST_ALL
+<- RESULT count=7
+  2026 Spring|COMP3003|Operating Systems|01|Dr. Chen|Mon|10:00|12:00|B201
+  2026 Spring|COMP3003|Operating Systems|02|Dr. Chen|Fri|10:00|12:00|B202
+  2026 Spring|COMP2001|Data Structures|01|Dr. Li|Tue|09:30|11:00|A101
+  2026 Fall|COMP2001|Data Structures|02|Dr. Wang|Thu|13:00|14:30|A102
+  2026 Fall|COMP1001|Introduction to Programming|01|Dr. Zhang|Mon|08:00|10:00|C305
+  2027 Spring|COMP4002|Computer Networks|01|Dr. Liu|Fri|15:00|17:00|D410
+  2025-2026|COMP3003|Test|1A|Dr.Test|Mon|10:00|12:00|E101
+  END
 
-客户端 → 服务器: LOGOUT
-服务器 → 客户端: OK Logged out successfully
+-> QUERY_CODE COMP3003
+<- RESULT count=3
+  2026 Spring|COMP3003|Operating Systems|01|Dr. Chen|Mon|10:00|12:00|B201
+  2026 Spring|COMP3003|Operating Systems|02|Dr. Chen|Fri|10:00|12:00|B202
+  2025-2026|COMP3003|Test|1A|Dr.Test|Mon|10:00|12:00|E101
+  END
+
+-> QUERY_INSTRUCTOR Dr. Chen
+<- RESULT count=2
+  2026 Spring|COMP3003|Operating Systems|01|Dr. Chen|Mon|10:00|12:00|B201
+  2026 Spring|COMP3003|Operating Systems|02|Dr. Chen|Fri|10:00|12:00|B202
+  END
+
+-> LOGOUT
+<- OK Logged out successfully
 ```
 
-### 管理员更新流程
+### Administrator Update Flow
 ```
-客户端 → 服务器: LOGIN admin admin123
-服务器 → 客户端: SUCCESS Login successful. Role: Admin
+-> LOGIN admin admin123
+<- SUCCESS Login successful. Role: Admin
 
-客户端 → 服务器: UPDATE COMP3003|02|day|Fri
-服务器 → 客户端: OK Record updated
+-> UPDATE COMP3003|01|classroom|A101
+<- OK Record updated
 
-客户端 → 服务器: QUERY_CODE COMP3003
-服务器 → 客户端: RESULT count=1
-2025-2026|COMP3003|Data Communications and Networking|02|Dr. Johnson|Fri|14:00|16:00|Room 302
-END
+-> QUERY_CODE COMP3003
+<- RESULT count=3
+  2026 Spring|COMP3003|Operating Systems|01|Dr. Chen|Mon|10:00|12:00|A101  (Updated!)
+  2026 Spring|COMP3003|Operating Systems|02|Dr. Chen|Fri|10:00|12:00|B202
+  2025-2026|COMP3003|Test|1A|Dr.Test|Mon|10:00|12:00|E101
+  END
+
+-> DELETE COMP3003|1A
+<- OK Record deleted
 ```
 
-### 用户注册流程
+### User Registration Flow
 ```
-客户端 → 服务器: REGISTER newuser pass123
-服务器 → 客户端: SUCCESS Registration successful. Role: Student
+-> REGISTER newuser pass1234
+<- SUCCESS Registration successful. Role: Student
 ```
 
-### 加密演示流程
+### Encryption Demo Flow
 ```
-客户端 → 服务器: ENCRYPT HelloWorld|key
-服务器 → 客户端: RESULT count=4
-Original: [HelloWorld]
-Key: [key]
-Encrypted (hex): [070a0e1f160b1c0b1d]
-Decrypted: [HelloWorld]
-END
+-> ENCRYPT HelloWorld|key
+<- RESULT count=4
+  Original: [HelloWorld]
+  Key: [key]
+  Encrypted (hex): [070a0e1f160b1c0b1d]
+  Decrypted: [HelloWorld]
+  END
 ```
 
 ---
 
-## 评分标准对照
+## Web UI Feature Walkthrough
 
-| 评分项 | 分数 | 对应实现 |
-|--------|------|----------|
-| 整体展示 (Overall Presentation) | 10 | 代码结构清晰，注释完整，README 文档详细，Web UI 美观 |
-| 整体实现 (Overall Implementation) | 10 | 所有功能模块完整实现，系统可正常运行 |
-| Bonus 功能 | 10 | Web UI + 高级搜索 + 数据缓存 + 加密通信 |
+### Panel Overview
+
+| Panel | Purpose |
+|-------|---------|
+| **Authentication** | Login / Register / Logout / Exit / Reconnect |
+| **Course Browser** | Search courses by code, instructor, or semester |
+| **Admin Panel** | Add / Update / Delete courses (Admin only) |
+| **Concurrency Tasks** | Multi-connection demo, stress test, sequential test |
+| **Protocol Demo** | Send raw protocol commands, view server responses |
+| **Encryption Demo** | XOR cipher encryption/decryption demonstration |
+| **Server Status** | Display server configuration and statistics |
+| **System Log** | Real-time operation log with timestamps |
+
+### Quick Navigation Bar
+Buttons at the top allow instant scrolling to any panel.
+
+### Connection Status Indicator
+- Green dot = Connected
+- Red dot = Disconnected (after Exit)
+- Reconnect button appears after Exit to restore connection
 
 ---
 
-## 开发环境
 
-- **操作系统**：Windows 11
-- **编译器**：MinGW g++ (C++11)
-- **网络库**：Winsock2 (ws2_32.lib)
-- **并发**：std::thread
-- **数据存储**：CSV 文件
-- **Web UI**：HTML + CSS + JavaScript（无外部依赖）
-- **GUI 客户端**：Win32 API (gdi32, comctl32)
+
+
+
+

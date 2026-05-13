@@ -113,6 +113,14 @@ Auth::LoginResult Auth::login(const std::string& username,
     return {true, it->second.role};
 }
 
+UserRole Auth::getUserRole(const std::string& username) const {
+    std::lock_guard<std::mutex> lock(m_mutex);
+
+    auto it = m_users.find(username);
+    if (it == m_users.end()) return UserRole::None;
+    return it->second.role;
+}
+
 Auth::LoginResult Auth::registerUser(const std::string& username,
                                       const std::string& password) {
     std::lock_guard<std::mutex> lock(m_mutex);

@@ -355,6 +355,15 @@ std::string Server::handleHttpRequest(const std::string& method,
     std::string user = getParam("user");
     std::string role = getParam("role");
 
+    auto isHttpAdmin = [&]() -> bool {
+        if (user.empty()) {
+            return false;
+        }
+
+        Auth auth("database/users.csv");
+        return auth.getUserRole(user) == UserRole::Admin;
+    };
+
     // Build TCP command
     std::string tcpCmd;
 
@@ -371,31 +380,13 @@ std::string Server::handleHttpRequest(const std::string& method,
     } else if (cmd == "query_semester") {
         tcpCmd = "QUERY_SEMESTER " + p1;
     } else if (cmd == "add") {
-        // Check if user is admin
-        if (role != "Admin") {
-            logger.info("HTTP API: add -> ERROR Permission denied (user=" + user + ", role=" + role + ")");
-            std::string jsonBody = "{\"response\":\"ERROR Permission denied\"}";
-            return httpResponse(200, "OK", "application/json", jsonBody);
-        }
         // p1 format: "semester|code|title|section|instructor|day|start|end|room"
         // Use pipe-separated format for ADD (protocol.cpp supports both pipe and space)
         tcpCmd = "ADD " + p1;
     } else if (cmd == "update") {
-        // Check if user is admin
-        if (role != "Admin") {
-            logger.info("HTTP API: update -> ERROR Permission denied (user=" + user + ", role=" + role + ")");
-            std::string jsonBody = "{\"response\":\"ERROR Permission denied\"}";
-            return httpResponse(200, "OK", "application/json", jsonBody);
-        }
         // p1 format: "code|section|field|value" (pipe-separated)
         tcpCmd = "UPDATE " + p1;
     } else if (cmd == "delete") {
-        // Check if user is admin
-        if (role != "Admin") {
-            logger.info("HTTP API: delete -> ERROR Permission denied (user=" + user + ", role=" + role + ")");
-            std::string jsonBody = "{\"response\":\"ERROR Permission denied\"}";
-            return httpResponse(200, "OK", "application/json", jsonBody);
-        }
         // p1 format: "code|section" (pipe-separated)
         tcpCmd = "DELETE " + p1;
     } else if (cmd == "raw") {
@@ -635,39 +626,97 @@ std::string Server::handleHttpRequest(const std::string& method,
             result = "FAILURE Username already exists";
         }
     } else if (req.type == CommandType::Add) {
-        Course course;
-        course.semester = req.fields[0];
-        course.courseCode = req.fields[1];
-        course.courseTitle = req.fields[2];
-        course.section = req.fields[3];
-        course.instructor = req.fields[4];
-        course.day = req.fields[5];
-        course.startTime = req.fields[6];
-        course.endTime = req.fields[7];
-        course.classroom = req.fields[8];
-        if (database.addCourse(course)) {
-            logger.info("HTTP API: add -> OK Record added (" + course.courseCode + " " + course.section + ")");
-            result = "OK Record added";
+        if (!isHttpAdmin()) {
+            logger.info("HTTP API: add -> ERROR Permission denied (user=" + user + ", client_role=" + role + ")");
+            result = "ERROR Permission denied";
         } else {
-            logger.info("HTTP API: add -> ERROR Record already exists (" + course.courseCode + " " + course.section + ")");
-            result = "ERROR Record already exists";
+            Course course;
+            course.semester = req.fields[0];
+            course.courseCode = req.fields[1];
+            course.courseTitle = req.fields[2];
+            course.section = req.fields[3];
+            course.instructor = req.fields[4];
+            course.day = req.fields[5];
+            course.startTime = req.fields[6];
+            course.endTime = req.fields[7];
+            course.classroom = req.fields[8];
+            logger.info("HTTP API: add -> Attempting to add: code=" + course.courseCode + " section=" + course.section + " semester=" + course.semester + " title=" + course.courseTitle + " instructor=" + course.instructor + " day=" + course.day + " start=" + course.startTime + " end=" + course.endTime + " room=" + course.classroom);
+            const CourseWriteStatus status = database.addCourseDetailed(course);
+            switch (status) {
+                case CourseWriteStatus::Success:
+                    logger.info("HTTP API: add -> OK Record added (" + course.courseCode + " " + course.section + ")");
+                    result = "OK Record added";
+                    break;
+                case CourseWriteStatus::DuplicateKey:
+                    logger.info("HTTP API: add -> ERROR Duplicate key (" + course.courseCode + " " + course.section + ")");
+                    result = "ERROR Record already exists";
+                    break;
+                case CourseWriteStatus::SaveFailed:
+                    logger.info("HTTP API: add -> ERROR File save failed (" + course.courseCode + " " + course.section + ")");
+                    result = "ERROR File save failed";
+                    break;
+                default:
+                    logger.info("HTTP API: add -> ERROR Invalid course data (" + course.courseCode + " " + course.section + ")");
+                    result = "ERROR Invalid course data";
+                    break;
+            }
         }
     } else if (req.type == CommandType::Update) {
-        if (database.updateCourseField(req.fields[0], req.fields[1],
-                                        req.fields[2], req.fields[3])) {
-            logger.info("HTTP API: update -> OK Record updated (" + req.fields[0] + " " + req.fields[1] + " " + req.fields[2] + "=" + req.fields[3] + ")");
-            result = "OK Record updated";
+        if (!isHttpAdmin()) {
+            logger.info("HTTP API: update -> ERROR Permission denied (user=" + user + ", client_role=" + role + ")");
+            result = "ERROR Permission denied";
         } else {
-            logger.info("HTTP API: update -> ERROR Record not found (" + req.fields[0] + " " + req.fields[1] + ")");
-            result = "ERROR Record not found";
+            const CourseWriteStatus status = database.updateCourseFieldDetailed(req.fields[0], req.fields[1],
+                                                                                 req.fields[2], req.fields[3]);
+            switch (status) {
+                case CourseWriteStatus::Success:
+                    logger.info("HTTP API: update -> OK Record updated (" + req.fields[0] + " " + req.fields[1] + " " + req.fields[2] + "=" + req.fields[3] + ")");
+                    result = "OK Record updated";
+                    break;
+                case CourseWriteStatus::NotFound:
+                    logger.info("HTTP API: update -> ERROR Record not found (" + req.fields[0] + " " + req.fields[1] + ")");
+                    result = "ERROR Record not found";
+                    break;
+                case CourseWriteStatus::InvalidField:
+                    logger.info("HTTP API: update -> ERROR Invalid field (" + req.fields[2] + ")");
+                    result = "ERROR Invalid field";
+                    break;
+                case CourseWriteStatus::InvalidValue:
+                    logger.info("HTTP API: update -> ERROR Invalid value (" + req.fields[2] + "=" + req.fields[3] + ")");
+                    result = "ERROR Invalid value";
+                    break;
+                case CourseWriteStatus::SaveFailed:
+                    logger.info("HTTP API: update -> ERROR File save failed (" + req.fields[0] + " " + req.fields[1] + ")");
+                    result = "ERROR File save failed";
+                    break;
+                default:
+                    result = "ERROR Update failed";
+                    break;
+            }
         }
     } else if (req.type == CommandType::DeleteCourse) {
-        if (database.deleteCourse(req.fields[0], req.fields[1])) {
-            logger.info("HTTP API: delete -> OK Record deleted (" + req.fields[0] + " " + req.fields[1] + ")");
-            result = "OK Record deleted";
+        if (!isHttpAdmin()) {
+            logger.info("HTTP API: delete -> ERROR Permission denied (user=" + user + ", client_role=" + role + ")");
+            result = "ERROR Permission denied";
         } else {
-            logger.info("HTTP API: delete -> ERROR Record not found (" + req.fields[0] + " " + req.fields[1] + ")");
-            result = "ERROR Record not found";
+            const CourseWriteStatus status = database.deleteCourseDetailed(req.fields[0], req.fields[1]);
+            switch (status) {
+                case CourseWriteStatus::Success:
+                    logger.info("HTTP API: delete -> OK Record deleted (" + req.fields[0] + " " + req.fields[1] + ")");
+                    result = "OK Record deleted";
+                    break;
+                case CourseWriteStatus::NotFound:
+                    logger.info("HTTP API: delete -> ERROR Record not found (" + req.fields[0] + " " + req.fields[1] + ")");
+                    result = "ERROR Record not found";
+                    break;
+                case CourseWriteStatus::SaveFailed:
+                    logger.info("HTTP API: delete -> ERROR File save failed (" + req.fields[0] + " " + req.fields[1] + ")");
+                    result = "ERROR File save failed";
+                    break;
+                default:
+                    result = "ERROR Delete failed";
+                    break;
+            }
         }
     } else if (req.type == CommandType::Encrypt) {
         std::string encrypted = Protocol::encryptXor(req.fields[0], req.fields[1]);

@@ -18,6 +18,7 @@ public:
 
     LoginResult login(const std::string& username, const std::string& password) const;
     LoginResult registerUser(const std::string& username, const std::string& password);
+    UserRole getUserRole(const std::string& username) const;
 
 private:
     struct UserEntry {
